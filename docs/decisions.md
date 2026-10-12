@@ -131,3 +131,50 @@ work around a tool limit, or fix a data-quality problem.
 - Why: How an account pays commissions today decides the pitch (greenfield vs displacement vs in-house), so it's a reportable picklist rather than free text; Clay normalizes values before write-back (see #6). Sales hiring is tracked separately from RevOps hiring because it measures comp-plan load, not buyer intent.
 - How: Old fields removed with a destructive-changes manifest (`salesforce/destructive/`), then a normal deploy; one script (`scripts/apply_flozero_schema.sh`) runs both, verifies, commits and pushes.
 - Trade-off accepted: The two signal picklists duplicate their values; a Global Value Set would keep them in sync but isn't worth the extra migration now.
+
+## #16 — Flozero ICP
+- Date: 2026-10-12
+- Status: Decided
+- Decision: B2B companies with 20–300 quota-carrying reps (proxy: 100–2,000 employees + open sales roles), Series B–D or profitable private, **Salesforce CRM only**, US + Canada. Competitor users are in the ICP as displacement targets at lower priority. Hard exclusions: competitors, no quota-carrying sales, >5,000 employees, staffing agencies, confirmed non-Salesforce CRM. Unknown CRM is scored and flagged, not excluded.
+- Why: The rep band is where spreadsheet comp breaks but enterprise ICM hasn't locked in. Salesforce-only keeps the integration story clean. Exclusions run before contact enrichment to save Clay credits.
+- Trade-off accepted: Excludes HubSpot-CRM mid-market accounts; revisit if account volume is too thin in Phase 2.
+
+## #17 — Five signal types, pain language as a bonus
+- Date: 2026-10-12
+- Status: Decided
+- Decision: Hiring RevOps, Sales Team Growth, Funding, Leadership Change, Competitor Mention (+ Other). Pain language in job posts ("commissions in Excel", "implement an ICM tool") is a bonus inside Hiring RevOps, not a separate type. Comp planning season is campaign timing, not an account score.
+- Why: Matches the deployed picklists (no redeploy); the role that names the pain scores highest.
+
+## #18 — Credit budget: ~20 curated accounts, signals captured without Clay
+- Date: 2026-10-12
+- Status: Decided
+- Context: Clay free plan is 100 data credits/month; failed lookups still cost credits.
+- Decision: ~20 hand-picked accounts covering every tier and edge case (competitor user, unknown CRM, an exclusion). All signals come from free sources (job feeds, funding CSV, leadership changes seeded by hand). Clay credits go to contacts + verified emails (Tier A, then B), then firmographic gaps; prototype on 3 accounts first; keep a ~20% reserve; never enrich Tier C or excluded accounts past firmographics.
+- Why: A small deliberate test set exercises every pipeline path and leaves enough credits to enrich each account properly instead of thinly.
+- Trade-off accepted: Not a realistic lead volume; the README frames the 20 as a test set and explains how it scales on a paid plan.
+
+## #19 — Scoring weights: Fit 30 + Intent 70
+- Date: 2026-10-12
+- Status: Decided
+- Decision: Fit (headcount 8, funding 8, incumbent tool 10, Salesforce confirmed 4) + Intent (Hiring RevOps 20/25, +10 pain bonus; Sales Team Growth 10/15/20; Funding 20; new CRO/VP Sales/VP RevOps 20; new CFO 13; Competitor Mention 5; Other 5), strongest instance per type, capped at 100.
+- Why: Fit can't reach Tier B alone, so every prioritized account has a real signal. The comp-analyst post with pain language is the strongest signal because it proves the pain. CFO vs CRO-level weighted 40:60 (13 vs 20) — CFOs care about comp accuracy and audit, but the CRO / RevOps leader usually chooses the tool. Competitor users get 3 fit points vs 10 for spreadsheets, making displacement lower priority by design.
+
+## #20 — Signal decay: events fade, states are re-measured
+- Date: 2026-10-12
+- Status: Decided
+- Decision: Hiring RevOps full 0–45 days / half 46–90 / expires >90; a closed posting keeps half points for 30 days after close. Funding and Leadership Change full 0–90 / half 91–180 / expire >180. Sales Team Growth and Competitor Mention are state signals re-measured every run. Half points round half up.
+- Why: Matches typical hiring, funding and new-leader timelines; the closed-posting grace period catches the new hire who is likely to look for a comp tool; re-scoring every run makes tiers drop on their own as signals age.
+
+## #21 — Tiers, SLAs and routing guardrails
+- Date: 2026-10-12
+- Status: Decided
+- Decision: Tier A = score ≥ 60 with at least one full-strength signal (task next business day, High; rationale + Gmail draft). Tier B = 35–59, or ≥ 60 with only decayed signals (task in 3 business days, Normal; rationale, no draft). Tier C = < 35 (no task; re-scored every run). One open automation task per account per reason; promotions create a task at the new SLA, demotions add nothing.
+- Why: The freshness rule keeps stale accounts out of Tier A; drafts only for Tier A keep the demo focused; task dedupe mirrors the record-level idempotency keys.
+
+## #22 — Fictional sales team: 2 AEs + 3 BDRs, territory routing
+- Date: 2026-10-12
+- Status: Decided
+- Context: Routing needs real owners. The Developer Edition org has 2 free full Salesforce licenses, 6 free Salesforce Platform licenses and 1 free Salesforce Integration license.
+- Decision: 5 fictional users — AEs Maya Chen (West) and Priya Raman (Central + East) on Salesforce licenses; BDRs Lucas Romero (West), Daniel Okafor (Central) and Hannah Brooks (East) on Platform licenses. AE owns the Account by HQ state/province; Tier A/B tasks go to the territory BDR; unknown location → RevOps "Fix territory" task. Mapping in `salesforce/territories.csv`; users created by `scripts/create_sales_team.sh` (re-runnable). Emails use the reserved `.example` domain. The Integration license is kept for the n8n API user in Phase 4.
+- Why: Fits the license pool exactly; AEs need full licenses for Opportunities later (BDR→AE handoff), BDRs only need Accounts, Contacts, Tasks and Signal__c. Territory routing mirrors how outbound teams split work and ties into Flozero's territory-planning module.
+- Trade-off accepted: Territories are unbalanced (Priya covers two); left as-is for a 20-account test set — rebalancing is a natural follow-up story.

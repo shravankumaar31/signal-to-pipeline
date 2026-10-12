@@ -1,0 +1,6 @@
+first_name,last_name,alias,role,license,profile,territory,time_zone
+Maya,Chen,mchen,Account Executive,Salesforce,Standard User,West,America/Los_Angeles
+Priya,Raman,praman,Account Executive,Salesforce,Standard User,Central+East,America/New_York
+Lucas,Romero,lromero,Business Development Rep,Salesforce Platform,Standard Platform User,West,America/Los_Angeles
+Daniel,Okafor,dokafor,Business Development Rep,Salesforce Platform,Standard Platform User,Central,America/Chicago
+Hannah,Brooks,hbrooks,Business Development Rep,Salesforce Platform,Standard Platform User,East,America/New_York
