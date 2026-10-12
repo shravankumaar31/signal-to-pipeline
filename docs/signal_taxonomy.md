@@ -181,6 +181,22 @@ Territories (US states + Canadian provinces): **West** — Pacific and Mountain 
 **Central** — Central time-zone states, SK, MB, NU; **East** — Eastern states + DC, ON, QC and Atlantic Canada.
 Moving a region between territories is a one-line edit in `territories.csv`.
 
+### Primary signal
+
+`Primary_Signal__c` = the signal type with the most **current** points. Ties break in this order:
+Hiring RevOps → Leadership Change → Funding → Sales Team Growth → Competitor Mention → Other.
+
 ## 6. Worked examples
 
-_Not started._
+Computed by `clay/scoring_reference.py` (as of 2026-10-12). All accounts are fictional. The Clay formula in
+Phase 3 must reproduce these exactly.
+
+| # | Account | Fit | Intent | Score | Tier | Primary | What it demonstrates |
+|---|---|---|---|---|---|---|---|
+| 1 | Spreadsheet scale-up: 450 emp, Series C, spreadsheets, Salesforce; comp-analyst post with pain language (10 days), 12 open sales roles | 30 | 50 | **80** | **A** | Hiring RevOps | The ideal account: proven pain + scaling team |
+| 2 | New CRO: 300 emp, Series B, incumbent unknown; new CRO (30 days), 6 open sales roles | 25 | 30 | **55** | **B** | Leadership Change | Not knowing the incumbent costs 5 points — enough to miss Tier A |
+| 3 | Competitor user: 800 emp, Series D, CaptivateIQ; comp-analyst post with pain language (20 days) | 21 | 40 | **61** | **A** | Hiring RevOps | A competitor user who is actively selecting a tool still reaches A |
+| 4 | Strong but stale: 250 emp, Series B, spreadsheets; funding (120 d), RevOps role (70 d), new VP Sales (100 d) | 30 | 30 | **60** | **B** | Hiring RevOps | Freshness rule: 60 points but nothing fresh → B, not A |
+| 5 | Role just filled: 1,200 emp, profitable, in-house; comp role closed 10 days ago, new CFO (40 d) | 21 | 26 | **47** | **B** | Hiring RevOps | Closed-posting grace period (half points); CFO at 13 |
+| 6 | Early, weak signal: 600 emp, Series A, unknown tool and CRM; one "Other" signal | 13 | 5 | **18** | **C** | Other | Watch list only — no rep time, no credits |
+| 7 | HubSpot CRM: 400 emp, Series B, spreadsheets; funding (15 d) | — | — | — | **Excluded** | — | Hard exclusion runs before scoring and enrichment |

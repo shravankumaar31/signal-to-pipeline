@@ -178,3 +178,9 @@ work around a tool limit, or fix a data-quality problem.
 - Decision: 5 fictional users — AEs Maya Chen (West) and Priya Raman (Central + East) on Salesforce licenses; BDRs Lucas Romero (West), Daniel Okafor (Central) and Hannah Brooks (East) on Platform licenses. AE owns the Account by HQ state/province; Tier A/B tasks go to the territory BDR; unknown location → RevOps "Fix territory" task. Mapping in `salesforce/territories.csv`; users created by `scripts/create_sales_team.sh` (re-runnable). Emails use the reserved `.example` domain. The Integration license is kept for the n8n API user in Phase 4.
 - Why: Fits the license pool exactly; AEs need full licenses for Opportunities later (BDR→AE handoff), BDRs only need Accounts, Contacts, Tasks and Signal__c. Territory routing mirrors how outbound teams split work and ties into Flozero's territory-planning module.
 - Trade-off accepted: Territories are unbalanced (Priya covers two); left as-is for a 20-account test set — rebalancing is a natural follow-up story.
+
+## #23 — Reference scorer and worked examples close Phase 1
+- Date: 2026-10-12
+- Status: Decided
+- Decision: `clay/scoring_reference.py` implements the full spec (fit, intent, decay, freshness, tiers, primary-signal tie-break) and is the source of truth the Phase 3 Clay formula must match. Seven fictional sample accounts all land on their intended tiers. Accepted outcomes: a competitor user actively selecting a tool can reach Tier A (sample 3, 61); an unknown incumbent can keep a new-CRO account in Tier B (sample 2, 55). Primary-signal ties break Hiring RevOps → Leadership Change → Funding → Sales Team Growth → Competitor Mention → Other.
+- Why: Testing the rules in code before building them in Clay catches design flaws cheaply and gives Phase 3 an exact target.

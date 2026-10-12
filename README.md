@@ -5,12 +5,12 @@ with explicit ownership rules, and use Claude via MCP to draft "why now" outreac
 
 **Fictional seller:** **Flozero** — *Commissions on autopilot. Zero spreadsheets, zero disputes.*
 Sales compensation (ICM) platform; CPQ and quota/territory planning are expansion modules.
-**ICP:** B2B companies with growing sales teams (defined in Phase 1, `docs/signal_taxonomy.md`)
+**ICP:** B2B companies with 20–300 quota-carrying reps, Series B–D, Salesforce CRM, US + Canada (`docs/signal_taxonomy.md`)
 
 > Flozero is a fictional company created for this portfolio project. Real tools named in this repo
 > (e.g. comp, CPQ and planning vendors) appear only as data — competitor or incumbent signals.
 
-> Status: Phase 1 — ICP and signal taxonomy (Phase 0 complete)
+> Status: Phase 2 — signal capture (Phases 0–1 complete)
 
 ## Architecture
 
@@ -30,8 +30,8 @@ Signal sources ──► Clay table ──► n8n ──► Salesforce
 
 | # | Phase | Status |
 |---|---|---|
-| 0 | Setup: repo, Salesforce org, schema, Clay, n8n | In progress |
-| 1 | ICP and signal taxonomy with weights | Not started |
+| 0 | Setup: repo, Salesforce org, schema, sales team, Clay | Done (n8n hosting open) |
+| 1 | ICP and signal taxonomy with weights | Done (`docs/signal_taxonomy.md`) |
 | 2 | Signal capture (Apify job scrape, funding CSV) | Not started |
 | 3 | Enrichment and scoring in Clay | Not started |
 | 3.5 | Field mapping and write-back rules | Spec done (`docs/salesforce_schema.md`) |
@@ -55,9 +55,10 @@ Rep-facing features layered on once Phases 0–6 are stable:
 docs/        schema, decisions log, signal taxonomy, findings
 data/raw/    seed lists, scraped signals (gitignored if they contain personal data)
 data/processed/
-clay/        table column specs and scoring formulas
+clay/        scoring_reference.py (source of truth for scores) + Clay column specs
 n8n/         exported workflow JSON
 prompts/     Claude prompts / skill for the MCP step
+scripts/     one-shot scripts: schema changes, sales team setup
 force-app/   Salesforce metadata: fields, Signal__c object, tab, permission set
 salesforce/  DEPLOY.md (CLI deploy), manual setup checklist, report definitions
 screenshots/
@@ -67,6 +68,8 @@ screenshots/
 
 - `docs/salesforce_schema.md` — every field, its type, source and write rule
 - `docs/decisions.md` — every judgment call and why
+- `docs/signal_taxonomy.md` — ICP, signals, weights, decay, tiers, routing, worked examples
+- `salesforce/sales_team.csv`, `salesforce/territories.csv` — fictional reps and territory routing
 
 ## Data and outreach policy
 
