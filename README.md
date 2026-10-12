@@ -3,10 +3,14 @@
 Capture buying signals, enrich and score accounts in Clay, write every field back to Salesforce
 with explicit ownership rules, and use Claude via MCP to draft "why now" outreach and create rep tasks.
 
-**Fictional seller:** a GPU cloud provider
-**ICP:** Series B–D AI/ML startups training models
+**Fictional seller:** **Flozero** — *Commissions on autopilot. Zero spreadsheets, zero disputes.*
+Sales compensation (ICM) platform; CPQ and quota/territory planning are expansion modules.
+**ICP:** B2B companies with growing sales teams (defined in Phase 1, `docs/signal_taxonomy.md`)
 
-> Status: Phase 0 — setup
+> Flozero is a fictional company created for this portfolio project. Real tools named in this repo
+> (e.g. comp, CPQ and planning vendors) appear only as data — competitor or incumbent signals.
+
+> Status: Phase 1 — ICP and signal taxonomy (Phase 0 complete)
 
 ## Architecture
 

@@ -43,12 +43,17 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>Account.Current_Compute_Provider__c</field>
+        <field>Account.Incumbent_Comp_Tool__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>Account.Open_ML_Roles_Count__c</field>
+        <field>Account.Open_RevOps_Roles_Count__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Account.Open_Sales_Roles_Count__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

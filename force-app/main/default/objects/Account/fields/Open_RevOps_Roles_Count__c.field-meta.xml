@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Open_ML_Roles_Count__c</fullName>
-    <label>Open ML Roles</label>
+    <fullName>Open_RevOps_Roles_Count__c</fullName>
+    <description>Open RevOps, Sales Ops and comp roles from job posts. Always overwrite.</description>
+    <label>Open RevOps Roles</label>
     <precision>4</precision>
     <scale>0</scale>
     <required>false</required>

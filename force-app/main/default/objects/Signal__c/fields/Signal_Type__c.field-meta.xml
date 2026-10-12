@@ -9,9 +9,14 @@
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
-                <fullName>Hiring ML Infra</fullName>
+                <fullName>Hiring RevOps</fullName>
                 <default>false</default>
-                <label>Hiring ML Infra</label>
+                <label>Hiring RevOps</label>
+            </value>
+            <value>
+                <fullName>Sales Team Growth</fullName>
+                <default>false</default>
+                <label>Sales Team Growth</label>
             </value>
             <value>
                 <fullName>Funding</fullName>

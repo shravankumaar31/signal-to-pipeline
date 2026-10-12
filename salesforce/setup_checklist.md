@@ -20,8 +20,9 @@ Setup → Object Manager → Account → Fields & Relationships → New
 - [ ] `Last_Funding_Amount__c` — Currency(16,0)
 - [ ] `Last_Funding_Date__c` — Date
 - [ ] `Tech_Stack__c` — Long Text Area(5000)
-- [ ] `Current_Compute_Provider__c` — Text(255)
-- [ ] `Open_ML_Roles_Count__c` — Number(4,0)
+- [ ] `Incumbent_Comp_Tool__c` — Picklist
+- [ ] `Open_RevOps_Roles_Count__c` — Number(4,0)
+- [ ] `Open_Sales_Roles_Count__c` — Number(4,0)
 - [ ] `Signal_Score__c` — Number(3,0)
 - [ ] `Signal_Tier__c` — Picklist (A, B, C)
 - [ ] `Primary_Signal__c` — Picklist

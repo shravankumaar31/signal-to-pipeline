@@ -101,3 +101,33 @@ work around a tool limit, or fix a data-quality problem.
 - Status: Decided
 - Context: The signal picklist value "Hiring – ML Infra" contained an en dash, which is easy to mistype in n8n mappings and Clay formulas and would fail a restricted picklist.
 - Decision: Use "Hiring ML Infra"; keep all picklist API values plain ASCII.
+
+## #13 — Permission set includes Account and Contact object access
+- Date: 2026-10-11
+- Status: Decided
+- Context: Dry run failed: "Permission Read Signal__c depends on permission(s): Read Account". A master-detail child's object permissions require at least the same access on the parent.
+- Decision: Add Account and Contact read/create/edit to Signal_Pipeline_Admin; set Signal__c View All to false so it doesn't require View All on Account.
+- Why: Makes the permission set self-contained, so it also works for a future least-privilege integration user, not just the System Administrator.
+
+## #14 — Seller switched from GPU cloud to Flozero (sales comp SaaS)
+- Date: 2026-10-12
+- Status: Decided (supersedes the GPU cloud framing in the original plan)
+- Context: The first framing was a fictional GPU cloud selling to AI/ML startups. Phase 1 had not started, so switching costs only a few schema field changes.
+- Options considered: Keep GPU cloud; switch to a B2B SaaS RevOps tool (comp / CPQ / planning, Everstage category).
+- Decision: Fictional seller **Flozero** — "Commissions on autopilot. Zero spreadsheets, zero disputes." Lead product is sales comp (ICM); CPQ and quota/territory planning are expansion modules.
+- Why: The buyer (RevOps, Sales Ops, Finance) matches the builder's own domain, so signals and messaging come from real experience; richer public signals (sales hiring, new CRO, comp-analyst job posts naming Excel or incumbent tools); CPQ ties into the quote-to-cash deal desk project; strong fit for GTM ops roles at RevOps-tool vendors.
+- Name check: "Payce" was considered and rejected — it is an existing payroll product (Ramco Payce). "Flozero" returned no existing company or product.
+- Trade-off accepted: GPU-specific Salesforce fields must be replaced and redeployed (Changes 2–6).
+
+## #15 — Schema swapped from GPU fields to Flozero fields
+- Date: 2026-10-12
+- Status: Decided
+- Context: Decision #14 changed the seller; four parts of the schema were GPU-specific.
+- Decision:
+  - `Current_Compute_Provider__c` (text) → `Incumbent_Comp_Tool__c` (picklist: Spreadsheets, Xactly, CaptivateIQ, Varicent, Spiff, QuotaPath, Everstage, Performio, In-house build, Other, Unknown). CPQ and planning tools go into the existing append-only `Tech_Stack__c`.
+  - `Open_ML_Roles_Count__c` → `Open_RevOps_Roles_Count__c` + `Open_Sales_Roles_Count__c`.
+  - Signal picklists (`Primary_Signal__c`, `Signal_Type__c`): Hiring RevOps, Sales Team Growth, Funding, Leadership Change, Competitor Mention, Other.
+  - `Persona__c`: Head of RevOps, Sales Ops / Comp Manager, CRO / VP Sales, CFO / VP Finance, Other.
+- Why: How an account pays commissions today decides the pitch (greenfield vs displacement vs in-house), so it's a reportable picklist rather than free text; Clay normalizes values before write-back (see #6). Sales hiring is tracked separately from RevOps hiring because it measures comp-plan load, not buyer intent.
+- How: Old fields removed with a destructive-changes manifest (`salesforce/destructive/`), then a normal deploy; one script (`scripts/apply_flozero_schema.sh`) runs both, verifies, commits and pushes.
+- Trade-off accepted: The two signal picklists duplicate their values; a Global Value Set would keep them in sync but isn't worth the extra migration now.

@@ -33,12 +33,13 @@ Completeness rule: every enriched field ends up **populated** or explained by
 | Funding Stage | `Funding_Stage__c` | Picklist: Seed, Series A, Series B, Series C, Series D, Series E+, Public, Unknown | Overwrite if newer | Funding seed CSV / Clay |
 | Last Funding Amount | `Last_Funding_Amount__c` | Currency(16,0) | Overwrite if newer | Funding seed CSV / Clay |
 | Last Funding Date | `Last_Funding_Date__c` | Date | Overwrite if newer | Funding seed CSV / Clay |
-| Tech Stack | `Tech_Stack__c` | Long Text Area(5000) | Append | Clay tech enrichment + job-post parsing |
-| Current Compute Provider | `Current_Compute_Provider__c` | Text(255) | Overwrite if newer | Job-post parsing |
-| Open ML Roles | `Open_ML_Roles_Count__c` | Number(4,0) | Always overwrite | Apify job scrape |
+| Tech Stack | `Tech_Stack__c` | Long Text Area(5000) | Append | CRM, CPQ and planning tools from Clay tech enrichment + job-post parsing |
+| Incumbent Comp Tool | `Incumbent_Comp_Tool__c` | Picklist: Spreadsheets, Xactly, CaptivateIQ, Varicent, Spiff, QuotaPath, Everstage, Performio, In-house build, Other, Unknown | Overwrite if newer | Job-post parsing, normalized in Clay (unrecognized → Other) |
+| Open RevOps Roles | `Open_RevOps_Roles_Count__c` | Number(4,0) | Always overwrite | Job scrape: RevOps, Sales Ops, comp roles |
+| Open Sales Roles | `Open_Sales_Roles_Count__c` | Number(4,0) | Always overwrite | Job scrape: AE, SDR/BDR, AM roles |
 | Signal Score | `Signal_Score__c` | Number(3,0) | Always overwrite | Clay scoring formula |
 | Signal Tier | `Signal_Tier__c` | Picklist: A, B, C | Always overwrite | Clay (A ≥ 60, B 35–59, C < 35) |
-| Primary Signal | `Primary_Signal__c` | Picklist: Hiring ML Infra, Funding, Leadership Change, Competitor Mention, Other | Always overwrite | Highest-weighted active signal |
+| Primary Signal | `Primary_Signal__c` | Picklist: Hiring RevOps, Sales Team Growth, Funding, Leadership Change, Competitor Mention, Other | Always overwrite | Highest-weighted active signal |
 | Signal Source URL | `Signal_Source_URL__c` | URL | Always overwrite | Signals table |
 | Last Signal Date | `Last_Signal_Date__c` | Date | Always overwrite | Signals table |
 | Enrichment Status | `Enrichment_Status__c` | Picklist: Complete, Partial, Not Attempted, Failed | Always overwrite | Clay metadata / n8n |
@@ -60,7 +61,7 @@ BillingCountry, Funding_Stage__c, Signal_Score__c, Signal_Tier__c, Primary_Signa
 | Email Verification | `Email_Verification_Status__c` | Picklist: Valid, Catch-all, Invalid, Unknown | Always overwrite | Clay verifier |
 | First / Last Name | `FirstName`, `LastName` (standard) | Text | Fill if blank | Clay person enrichment |
 | Title | `Title` (standard) | Text | Overwrite if newer | Clay |
-| Persona | `Persona__c` | Picklist: ML Infra Lead, Head of AI/ML, CTO / VP Eng, Founder / CEO, Other | Always overwrite | Clay formula from title |
+| Persona | `Persona__c` | Picklist: Head of RevOps, Sales Ops / Comp Manager, CRO / VP Sales, CFO / VP Finance, Other | Always overwrite | Clay formula from title |
 | Seniority | `Seniority__c` | Picklist: C-Level, VP, Director, Manager, IC | Overwrite if newer | Clay |
 | LinkedIn URL | `LinkedIn_URL__c` | URL | Fill if blank | Clay |
 | Mailing City / Country | `MailingCity`, `MailingCountry` (standard) | Address | Fill if blank | Clay |
@@ -89,7 +90,7 @@ Keeps the full signal history per account; the Account fields above hold only th
 | Signal Date | `Signal_Date__c` | Date | |
 | Points | `Points__c` | Number(3,0) | Weight at time of capture |
 | Source URL | `Source_URL__c` | URL | |
-| Detail | `Detail__c` | Text Area(255) | e.g. "Hiring: Senior ML Infrastructure Engineer" |
+| Detail | `Detail__c` | Text Area(255) | e.g. "Hiring: Sales Compensation Analyst (mentions Excel)" |
 
 Optional rollup on Account: `Active_Signal_Count__c` = COUNT of Signal__c where Signal_Date__c in the last 30 days
 (use a scheduled flow or calculate in Clay if rollup filters on date aren't allowed).

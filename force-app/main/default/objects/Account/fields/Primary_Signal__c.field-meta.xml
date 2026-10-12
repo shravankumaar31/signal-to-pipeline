@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Primary_Signal__c</fullName>
+    <description>Highest-weighted active signal.</description>
     <label>Primary Signal</label>
     <required>false</required>
     <type>Picklist</type>
@@ -9,9 +10,14 @@
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
-                <fullName>Hiring ML Infra</fullName>
+                <fullName>Hiring RevOps</fullName>
                 <default>false</default>
-                <label>Hiring ML Infra</label>
+                <label>Hiring RevOps</label>
+            </value>
+            <value>
+                <fullName>Sales Team Growth</fullName>
+                <default>false</default>
+                <label>Sales Team Growth</label>
             </value>
             <value>
                 <fullName>Funding</fullName>

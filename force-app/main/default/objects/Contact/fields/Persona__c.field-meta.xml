@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Persona__c</fullName>
+    <description>Buyer persona derived from title in Clay.</description>
     <label>Persona</label>
     <required>false</required>
     <type>Picklist</type>
@@ -9,24 +10,24 @@
         <valueSetDefinition>
             <sorted>false</sorted>
             <value>
-                <fullName>ML Infra Lead</fullName>
+                <fullName>Head of RevOps</fullName>
                 <default>false</default>
-                <label>ML Infra Lead</label>
+                <label>Head of RevOps</label>
             </value>
             <value>
-                <fullName>Head of AI/ML</fullName>
+                <fullName>Sales Ops / Comp Manager</fullName>
                 <default>false</default>
-                <label>Head of AI/ML</label>
+                <label>Sales Ops / Comp Manager</label>
             </value>
             <value>
-                <fullName>CTO / VP Eng</fullName>
+                <fullName>CRO / VP Sales</fullName>
                 <default>false</default>
-                <label>CTO / VP Eng</label>
+                <label>CRO / VP Sales</label>
             </value>
             <value>
-                <fullName>Founder / CEO</fullName>
+                <fullName>CFO / VP Finance</fullName>
                 <default>false</default>
-                <label>Founder / CEO</label>
+                <label>CFO / VP Finance</label>
             </value>
             <value>
                 <fullName>Other</fullName>
