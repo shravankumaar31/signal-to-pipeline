@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Signal_Type__c</fullName>
+    <label>Signal Type</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Hiring ML Infra</fullName>
+                <default>false</default>
+                <label>Hiring ML Infra</label>
+            </value>
+            <value>
+                <fullName>Funding</fullName>
+                <default>false</default>
+                <label>Funding</label>
+            </value>
+            <value>
+                <fullName>Leadership Change</fullName>
+                <default>false</default>
+                <label>Leadership Change</label>
+            </value>
+            <value>
+                <fullName>Competitor Mention</fullName>
+                <default>false</default>
+                <label>Competitor Mention</label>
+            </value>
+            <value>
+                <fullName>Other</fullName>
+                <default>false</default>
+                <label>Other</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

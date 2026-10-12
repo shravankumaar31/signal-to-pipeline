@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Funding_Stage__c</fullName>
+    <label>Funding Stage</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Seed</fullName>
+                <default>false</default>
+                <label>Seed</label>
+            </value>
+            <value>
+                <fullName>Series A</fullName>
+                <default>false</default>
+                <label>Series A</label>
+            </value>
+            <value>
+                <fullName>Series B</fullName>
+                <default>false</default>
+                <label>Series B</label>
+            </value>
+            <value>
+                <fullName>Series C</fullName>
+                <default>false</default>
+                <label>Series C</label>
+            </value>
+            <value>
+                <fullName>Series D</fullName>
+                <default>false</default>
+                <label>Series D</label>
+            </value>
+            <value>
+                <fullName>Series E+</fullName>
+                <default>false</default>
+                <label>Series E+</label>
+            </value>
+            <value>
+                <fullName>Public</fullName>
+                <default>false</default>
+                <label>Public</label>
+            </value>
+            <value>
+                <fullName>Unknown</fullName>
+                <default>false</default>
+                <label>Unknown</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

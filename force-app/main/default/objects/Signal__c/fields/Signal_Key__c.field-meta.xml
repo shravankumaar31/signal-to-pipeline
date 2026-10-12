@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Signal_Key__c</fullName>
+    <description>domain|signal_type|signal_date. Makes re-runs idempotent.</description>
+    <label>Signal Key</label>
+    <length>255</length>
+    <caseSensitive>false</caseSensitive>
+    <externalId>true</externalId>
+    <unique>true</unique>
+    <required>false</required>
+    <type>Text</type>
+</CustomField>

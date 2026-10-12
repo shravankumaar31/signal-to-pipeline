@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Points__c</fullName>
+    <description>Weight at time of capture.</description>
+    <label>Points</label>
+    <precision>3</precision>
+    <scale>0</scale>
+    <required>false</required>
+    <type>Number</type>
+</CustomField>

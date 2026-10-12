@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Persona__c</fullName>
+    <label>Persona</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>ML Infra Lead</fullName>
+                <default>false</default>
+                <label>ML Infra Lead</label>
+            </value>
+            <value>
+                <fullName>Head of AI/ML</fullName>
+                <default>false</default>
+                <label>Head of AI/ML</label>
+            </value>
+            <value>
+                <fullName>CTO / VP Eng</fullName>
+                <default>false</default>
+                <label>CTO / VP Eng</label>
+            </value>
+            <value>
+                <fullName>Founder / CEO</fullName>
+                <default>false</default>
+                <label>Founder / CEO</label>
+            </value>
+            <value>
+                <fullName>Other</fullName>
+                <default>false</default>
+                <label>Other</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

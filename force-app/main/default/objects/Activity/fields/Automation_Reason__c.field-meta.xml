@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Automation_Reason__c</fullName>
+    <label>Automation Reason</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Tier A Outreach</fullName>
+                <default>false</default>
+                <label>Tier A Outreach</label>
+            </value>
+            <value>
+                <fullName>Manual Research Needed</fullName>
+                <default>false</default>
+                <label>Manual Research Needed</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>
