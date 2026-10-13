@@ -1,0 +1,22 @@
+account,domain,hq_city,hq_region,hq_country,employee_band,funding_stage,crm,incumbent_comp_tool,expected_tier,expected_score,primary_signal,domain_verified
+Keeper Security,keepersecurity.com,Chicago,IL,US,501-1000,Profitable private,Salesforce,Unknown,A,77,Hiring RevOps,Y
+Sierra,sierra.ai,San Francisco,CA,US,1001-5000,Series E,Salesforce,Unknown,A,71,Hiring RevOps,Y
+Gong,gong.io,San Francisco,CA,US,1001-5000,Series E,Salesforce,Other,A,66,Hiring RevOps,Y
+Notion,notion.com,San Francisco,CA,US,501-1000,Series C,Salesforce,Everstage,A,63,Hiring RevOps,Y
+Confido,confidotech.com,New York,NY,US,51-200,Series B,Salesforce,Unknown,A,61,Hiring RevOps,Y
+Tines,tines.com,Boston,MA,US,201-500,Series C,Salesforce,CaptivateIQ,B,48,Hiring RevOps,Y
+Numeral,numeral.com,San Francisco,CA,US,51-200,Series C,Unknown,Unknown,B,47,Funding,Y
+Semperis,semperis.com,Hoboken,NJ,US,501-1000,Series D,Salesforce,Xactly,B,46,Hiring RevOps,Y
+Socure,socure.com,Incline Village,NV,US,201-500,Series E,Unknown,Unknown,B,43,Funding,Y
+Bazaarvoice,bazaarvoice.com,Austin,TX,US,1001-5000,Profitable private,Salesforce,Everstage,B,41,Hiring RevOps,Y
+Ema,ema.ai,Mountain View,CA,US,51-200,Series B,Unknown,Unknown,B,37,Funding,Y
+Flow Engineering,flowengineering.com,San Francisco,CA,US,11-50,Series B,Unknown,Unknown,C (capped),63,Hiring RevOps,Y
+Flai,useflai.com,San Francisco,CA,US,51-200,Series A,Salesforce,Spreadsheets,C (capped),58,Hiring RevOps,Y
+Outmarket,outmarket.ai,San Francisco,CA,US,11-50,Series B,Unknown,Spreadsheets,C (capped),43,Funding,Y
+DoiT,doit.com,Santa Clara,CA,US,501-1000,Profitable private,Unknown,Unknown,C,33,Sales Team Growth,Y
+Chainguard,chainguard.dev,Kirkland,WA,US,201-500,Series D,Unknown,Everstage,C,32,Sales Team Growth,Y
+Solink,solink.com,Ottawa,ON,CA,201-500,Series C,Unknown,Unknown,C,31,Sales Team Growth,Y
+Tailscale,tailscale.com,Toronto,ON,CA,201-500,Series C,Unknown,CaptivateIQ,C,29,Sales Team Growth,Y
+Metaview,metaview.ai,London,,GB,51-200,Series C,Unknown,Unknown,Excluded,,legal HQ outside US + Canada,Y
+Clipboard Health,clipboardhealth.com,San Francisco,CA,US,501-1000,Series C,Unknown,Spreadsheets,Excluded,,staffing / recruiting marketplace,Y
+Ambrook,ambrook.com,New York,NY,US,51-200,Series B,HubSpot,Spreadsheets,Excluded,,CRM is HubSpot,Y

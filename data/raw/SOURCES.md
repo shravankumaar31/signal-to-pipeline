@@ -24,3 +24,8 @@ Funding sources for the recently funded pass: parsers.substack.com weekly fundin
 - Apify `wickfeed/ats-job-aggregator`, preset `starter-500`, title-phrase keywords (Commission/Commissions Analyst, Manager, Accountant, Specialist; Incentive / Sales Compensation Analyst), posted after 2026-08-01, 3 per board — run `S6086XH2ywxr050wX`, 4 jobs (KnowBe4, Keeper Security, New Relic, Collibra), ~$0.004. Only Keeper names no ICM tool.
 - Apify `wickfeed/ats-job-aggregator` on 10 candidate boards (Keeper + recent Series B/C from funding news) for sales / RevOps / finance roles — run `E678elELbq7jju8Fe`, 95 jobs, ~$0.10.
 - Funding news: TechCrunch, Insurance Journal, vcbacked.co, nosh.com (Confido), Seedtable (Numeral).
+
+## Phase 2 close-out
+
+- Backfill rows (Keeper Security, Confido, Numeral, Ema) added to `job_signals_2026-10-12.csv` and `funding_signals_2026-10-12.csv` so the raw CSVs, not the preview scripts, are the source of truth.
+- `data/processed/clay_import_accounts.csv` — one row per account for the Phase 3 Clay import: domain (Salesforce match key), HQ city / region / country (territory routing), band, funding, CRM, incumbent, and the expected tier / score / primary signal from `clay/final_set_preview.py` (the Clay formula must reproduce them). All 21 domains verified by hand (Confido, Ema, Flai checked on their websites).
