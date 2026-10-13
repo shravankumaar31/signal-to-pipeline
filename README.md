@@ -10,7 +10,7 @@ Sales compensation (ICM) platform; CPQ and quota/territory planning are expansio
 > Flozero is a fictional company created for this portfolio project. Real tools named in this repo
 > (e.g. comp, CPQ and planning vendors) appear only as data — competitor or incumbent signals.
 
-> Status: Phase 2 — signal capture (Phases 0–1 complete)
+> Status: Phase 3 — enrichment and scoring in Clay (Phases 0–2 complete)
 
 ## Architecture
 
@@ -32,7 +32,7 @@ Signal sources ──► Clay table ──► n8n ──► Salesforce
 |---|---|---|
 | 0 | Setup: repo, Salesforce org, schema, sales team, Clay | Done (n8n hosting open) |
 | 1 | ICP and signal taxonomy with weights | Done (`docs/signal_taxonomy.md`) |
-| 2 | Signal capture (Apify job scrape, funding CSV) | Not started |
+| 2 | Signal capture (Apify job scrape, funding CSV, leadership seed) | Done — 21-account test set (`data/processed/account_set_preview.csv`) |
 | 3 | Enrichment and scoring in Clay | Not started |
 | 3.5 | Field mapping and write-back rules | Spec done (`docs/salesforce_schema.md`) |
 | 4 | Salesforce upserts and tier routing via n8n | Not started |
@@ -47,6 +47,7 @@ Rep-facing features layered on once Phases 0–6 are stable:
 - Reply triage + re-engagement dates (BDR)
 - Pre-meeting brief from calendar events (AE)
 - Signal feedback loop: meeting rate by signal type → recalibrate weights (RevOps)
+- Social pain signals: public forum / community posts describing comp pain (e.g. "commissions in Excel"), mapped to an account → new "Pain Post" signal type (decision #32)
 - Later: buying committee mapping, job-change alerts, post-call updates, BDR→AE handoff summary, deal risk alerts
 
 ## Repo layout
@@ -74,4 +75,5 @@ screenshots/
 ## Data and outreach policy
 
 - Outreach is drafted to a test inbox only; nothing is sent to real prospects.
-- Contact data in this repo is synthetic or limited to public business information.
+- Accounts are real companies; only company-level public information (domains, job post URLs, funding and
+  leadership news) is committed. Contact names and emails live only in the private Salesforce dev org.

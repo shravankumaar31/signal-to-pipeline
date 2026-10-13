@@ -17,10 +17,10 @@ to already be locked into an enterprise tool?**
 |---|---|---|
 | Company type | B2B companies with quota-carrying sales teams (SaaS, fintech, B2B services) | No quota-carrying reps, no commission problem |
 | Sales team size | 20–300 quota-carrying reps | Under 20, spreadsheets still work; over 300 is enterprise, usually already on an enterprise ICM tool with long cycles |
-| Headcount (proxy) | 100–2,000 employees | Rep count is hard to get directly; headcount plus open sales roles stands in for it |
-| Funding stage | Series B–D, or profitable private | Post-B is when sales scales and the first RevOps / comp hire happens |
+| Headcount (proxy) | 100–2,000 employees (under 100 capped at Tier C) | Rep count is hard to get directly; headcount plus open sales roles stands in for it |
+| Funding stage | Series B–D, or profitable private (Series E+ and public companies scored with 0 funding points; Series A and below capped at Tier C) | Post-B is when sales scales and the first RevOps / comp hire happens |
 | CRM | **Salesforce only** | Flozero's integration story for this project; detected from `Tech_Stack__c` |
-| Geography | US + Canada | One market; California's written-commission-agreement requirement adds a compliance angle |
+| Geography | US + Canada, judged by **legal HQ** | One market; California's written-commission-agreement requirement adds a compliance angle |
 | Incumbent comp tool | Spreadsheets, in-house, **or a competitor** | Competitor users are in the ICP as displacement targets, at lower priority than spreadsheet users (weighted in section 3) |
 
 ### Hard exclusions (never scored, never enriched past firmographics)
@@ -29,7 +29,8 @@ to already be locked into an enterprise tool?**
 |---|---|
 | Competitors: comp, CPQ and planning vendors | Domain on a maintained competitor list |
 | No quota-carrying sales (product-led only, consumer) | No sales roles open and none on the team |
-| Over 5,000 employees | Headcount |
+| Over 5,000 employees | Headcount (or LinkedIn band 5,001+) |
+| Legal HQ outside US + Canada | HQ country (legal entity, not the location of the US sales team) |
 | Staffing / recruiting agencies | Industry |
 | CRM is confirmed **not** Salesforce (e.g. HubSpot) | `Tech_Stack__c` |
 
@@ -85,7 +86,8 @@ prioritized account has at least one real signal.
 | Factor | Points |
 |---|---|
 | Headcount 200–1,000 (sweet spot) / 100–199 or 1,001–2,000 | 8 / 4 |
-| Funding: Series B or C / Series D / profitable private / other | 8 / 6 / 5 / 0 |
+| ↳ only a LinkedIn band known: 201–500 or 501–1,000 / 51–200 or 1,001–5,000 / 11–50 | 8 / 4 / 0 |
+| Funding: Series B or C / Series D / profitable private (incl. PE-owned) / other (Series E+, public, Series A) | 8 / 6 / 5 / 0 |
 | Incumbent comp tool: Spreadsheets / In-house build / Unknown / competitor or Other | 10 / 8 / 5 / 3 |
 | CRM: Salesforce confirmed / unknown | 4 / 0 |
 
@@ -144,6 +146,10 @@ a quarter; new CROs usually redesign comp in their first quarter.
 | **C** | Score < 35 | Watch; no rep time yet |
 | Excluded | Fails an ICP hard exclusion | Never scored or enriched |
 
+**Below-ICP floor cap:** accounts at **Series A or earlier**, or with **under 100 employees** (exact count, or
+LinkedIn band 1–10 / 11–50), are scored normally but capped at **Tier C** — the signal is recorded, but no rep
+time or credits are spent until they grow into the ICP.
+
 The **freshness rule** stops an account reaching Tier A on several half-decayed signals: if nothing is
 fresh, it isn't urgent.
 
@@ -199,4 +205,8 @@ Phase 3 must reproduce these exactly.
 | 4 | Strong but stale: 250 emp, Series B, spreadsheets; funding (120 d), RevOps role (70 d), new VP Sales (100 d) | 30 | 30 | **60** | **B** | Hiring RevOps | Freshness rule: 60 points but nothing fresh → B, not A |
 | 5 | Role just filled: 1,200 emp, profitable, in-house; comp role closed 10 days ago, new CFO (40 d) | 21 | 26 | **47** | **B** | Hiring RevOps | Closed-posting grace period (half points); CFO at 13 |
 | 6 | Early, weak signal: 600 emp, Series A, unknown tool and CRM; one "Other" signal | 13 | 5 | **18** | **C** | Other | Watch list only — no rep time, no credits |
+| 8 | **Just funded, still on spreadsheets:** 250 emp, Series B (25 days ago), spreadsheets, Salesforce, 8 open sales roles | 30 | 30 | **60** | **A** | Funding | The Phase 2 sourcing target: fresh money + spreadsheets + hiring reps reaches A even before a comp hire |
+| 9 | Strong signals, Series A: 150 emp, spreadsheets, Salesforce; comp post with pain language (5 d), 6 open sales roles | 18 | 45 | **63** | **C (capped)** | Hiring RevOps | Funding-floor cap: great signal, too early — watch list |
+| 11 | Just funded, 40 people: Series B (10 d), unknown tool, Salesforce; RevOps role (7 d), 5 open sales roles | 12 | 50 | **62** | **C (capped)** | Hiring RevOps | Under-100 floor: strong timing, team too small to feel comp pain |
+| 10 | Legal HQ in London: 300 emp, Series C; funding (20 d) | — | — | — | **Excluded** | — | Legal HQ rule: a US sales office doesn't make it a US account |
 | 7 | HubSpot CRM: 400 emp, Series B, spreadsheets; funding (15 d) | — | — | — | **Excluded** | — | Hard exclusion runs before scoring and enrichment |

@@ -18,6 +18,19 @@ def headcount_pts(n):
     if 100 <= n <= 199 or 1001 <= n <= 2000: return 4
     return 0
 
+# When only a LinkedIn band is known (no exact count), score the band (decision #29).
+BAND_PTS = {"11-50": 0, "51-200": 4, "201-500": 8, "501-1000": 8, "1001-5000": 4}
+EXCLUDED_BANDS = {"5001-10000", "10001+"}
+
+ICP_COUNTRIES = {"US", "CA"}                               # legal HQ (decision #27)
+BELOW_FLOOR_FUNDING = {"Pre-seed", "Seed", "Series A"}     # capped at Tier C (decision #28)
+BELOW_FLOOR_BANDS = {"1-10", "11-50"}                      # under 100 employees: capped at Tier C (decision #30)
+
+def below_floor(acct):
+    if acct.funding in BELOW_FLOOR_FUNDING: return True
+    if acct.headcount: return acct.headcount < 100
+    return acct.headcount_band in BELOW_FLOOR_BANDS
+
 FUNDING_PTS = {"Series B": 8, "Series C": 8, "Series D": 6, "Profitable private": 5}
 INCUMBENT_PTS = {"Spreadsheets": 10, "In-house build": 8, "Unknown": 5}   # any competitor / Other -> 3
 CRM_PTS = {"Salesforce": 4}                                               # unknown -> 0
@@ -86,14 +99,21 @@ class Account:
     crm: str                                              # "Salesforce", "HubSpot", "Unknown", ...
     signals: list = field(default_factory=list)
     excluded_reason: Optional[str] = None
+    hq_country: str = "US"                                # legal HQ, ISO-2
+    headcount_band: Optional[str] = None                  # LinkedIn band, used when headcount is 0 / unknown
 
 def score(acct, today=TODAY):
     if acct.crm not in ("Salesforce", "Unknown"):
         return {"tier": "Excluded", "reason": f"CRM is {acct.crm}"}
     if acct.excluded_reason:
         return {"tier": "Excluded", "reason": acct.excluded_reason}
+    if acct.hq_country not in ICP_COUNTRIES:
+        return {"tier": "Excluded", "reason": f"legal HQ outside US + Canada ({acct.hq_country})"}
+    if acct.headcount > 5000 or acct.headcount_band in EXCLUDED_BANDS:
+        return {"tier": "Excluded", "reason": "over 5,000 employees"}
 
-    fit = (headcount_pts(acct.headcount) + FUNDING_PTS.get(acct.funding, 0)
+    hc = headcount_pts(acct.headcount) if acct.headcount else BAND_PTS.get(acct.headcount_band, 0)
+    fit = (hc + FUNDING_PTS.get(acct.funding, 0)
            + INCUMBENT_PTS.get(acct.incumbent, 3) + CRM_PTS.get(acct.crm, 0))
 
     best = {}                                             # strongest instance per type
@@ -108,11 +128,13 @@ def score(acct, today=TODAY):
     if total >= 60 and has_fresh: tier = "A"
     elif total >= 35: tier = "B"
     else: tier = "C"
+    capped = below_floor(acct) and tier != "C"
+    if capped: tier = "C"                                 # below the funding floor: watch list only
 
     live = [(p, t) for t, (p, _) in best.items() if p > 0]
     primary = max(live, key=lambda x: (x[0], -TIE_BREAK.index(x[1])))[1] if live else None
     return {"fit": fit, "intent": intent, "score": total, "tier": tier, "primary": primary,
-            "fresh": has_fresh, "breakdown": {t: p for t, (p, _) in best.items()}}
+            "fresh": has_fresh, "capped": capped, "breakdown": {t: p for t, (p, _) in best.items()}}
 
 # ---------- Worked examples (fictional accounts) ----------
 def d(days_ago): return date.fromordinal(TODAY.toordinal() - days_ago)
@@ -135,6 +157,15 @@ EXAMPLES = [
         Signal("Leadership Change", d(40), role="CFO")]), "B"),
     (Account("Sample 6: early, weak signal", 600, "Series A", "Unknown", "Unknown", [
         Signal("Other", d(5))]), "C"),
+    (Account("Sample 8: just funded, still on spreadsheets", 250, "Series B", "Spreadsheets", "Salesforce", [
+        Signal("Funding", d(25)), Signal("Sales Team Growth", open_sales_roles=8)]), "A"),
+    (Account("Sample 9: strong signals, Series A", 150, "Series A", "Spreadsheets", "Salesforce", [
+        Signal("Hiring RevOps", d(5), comp_specific=True, pain_language=True),
+        Signal("Sales Team Growth", open_sales_roles=6)]), "C"),
+    (Account("Sample 11: just funded, 40 people", 40, "Series B", "Unknown", "Salesforce", [
+        Signal("Hiring RevOps", d(7)), Signal("Funding", d(10)), Signal("Sales Team Growth", open_sales_roles=5)]), "C"),
+    (Account("Sample 10: legal HQ in London", 300, "Series C", "Unknown", "Salesforce", [
+        Signal("Funding", d(20))], hq_country="GB"), "Excluded"),
     (Account("Sample 7: HubSpot CRM", 400, "Series B", "Spreadsheets", "HubSpot", [
         Signal("Funding", d(15))]), "Excluded"),
 ]
@@ -150,7 +181,7 @@ if __name__ == "__main__":
             print(f"{acct.name:<48} Excluded ({r['reason']})  [{mark}]")
         else:
             print(f"{acct.name:<48} fit {r['fit']:>2} + intent {r['intent']:>2} = {r['score']:>3}  "
-                  f"Tier {r['tier']}  primary: {r['primary']}  fresh: {r['fresh']}  [{mark}]")
+                  f"Tier {r['tier']}{' (capped)' if r['capped'] else ''}  primary: {r['primary']}  fresh: {r['fresh']}  [{mark}]")
             print(f"{'':<48} {r['breakdown']}")
     print("\nAll examples match expected tiers." if ok else "\nSome examples did not match.")
     raise SystemExit(0 if ok else 1)

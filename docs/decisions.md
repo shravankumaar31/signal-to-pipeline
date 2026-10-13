@@ -184,3 +184,89 @@ work around a tool limit, or fix a data-quality problem.
 - Status: Decided
 - Decision: `clay/scoring_reference.py` implements the full spec (fit, intent, decay, freshness, tiers, primary-signal tie-break) and is the source of truth the Phase 3 Clay formula must match. Seven fictional sample accounts all land on their intended tiers. Accepted outcomes: a competitor user actively selecting a tool can reach Tier A (sample 3, 61); an unknown incumbent can keep a new-CRO account in Tier B (sample 2, 55). Primary-signal ties break Hiring RevOps → Leadership Change → Funding → Sales Team Growth → Competitor Mention → Other.
 - Why: Testing the rules in code before building them in Clay catches design flaws cheaply and gives Phase 3 an exact target.
+
+## #24 — Real companies, company-level data public, people data private
+- Date: 2026-10-12
+- Status: Decided
+- Decision: The ~20 accounts are real companies sourced from live public job posts and news. Company names, domains, job post URLs and funding / leadership news go in `data/raw/*.csv` and Salesforce. Contact names and emails (Clay, Phase 3) live only in the private Salesforce dev org — the data CSVs are gitignored. Outreach is Gmail drafts to a test inbox only. No companies are excluded by preference.
+- Why: Clay can only enrich real domains, and real job posts make every signal verifiable by a reviewer. Keeping people's details out of the public repo is the line between a credible demo and publishing personal data.
+
+## #25 — Apify for job signals: two actors, title filters, spend capped
+- Date: 2026-10-12
+- Status: Decided
+- Context: The plan was Apify for job scraping. Free-tier behaviour found while running it: `bovi/greenhouse-lever-ashby-job-scraper` report mode processed only the first company per run, and job mode capped runs at 10 results. `wickfeed/ats-job-aggregator` has no such cap, but its keyword filter also matches job descriptions — "Compensation" matched pay boilerplate in almost every posting, so the run hit its $0.50 charge cap after 501 jobs.
+- Decision: Comp / commission roles from `bovi` with a title-only filter (few results, full descriptions). Open sales-role counts from `wickfeed`. Every run carries a `maxTotalChargeUsd` cap. Next time, `wickfeed` keywords must be title-specific phrases only (never "Compensation").
+- Result: 17 boards captured for ~$0.58 total. Raw output in `data/raw/job_signals_2026-10-12.csv` with run IDs in `data/raw/SOURCES.md`. Several search-result postings (Tines analyst, Tailscale, Chainguard, Perforce comp roles) had already closed — the live feed is the source of truth.
+- Also: `.gitignore` changed so company-level CSVs are committed and only contact files are ignored (applies #24).
+
+## #26 — Sourcing filter: spreadsheet-only + recently funded (ICP unchanged)
+- Date: 2026-10-12
+- Status: Decided (a first draft wrongly changed the ICP; reverted the same day)
+- Context: The first Apify pass showed most companies hiring comp analysts already run an ICM tool — displacement deals.
+- Decision: The ICP (#16) and weights (#19) stay exactly as defined. Phase 2 **sourcing** is filtered to companies that (1) still run commissions on spreadsheets and (2) announced a Series B–D round in the last ~90 days. "About to be funded" isn't publicly observable, so recent funding is the proxy. Competitor users remain in the ICP and can still enter the set as edge cases.
+- Why: Filters what we look for, not how we score — the scoring model stays general while the test set leans toward Flozero's best story (greenfield, fresh budget).
+- Example: sample 8 (250 employees, Series B 25 days ago, spreadsheets, Salesforce, 8 open sales roles) scores 60 → Tier A with no comp hire yet.
+
+## #27 — Geography is judged by legal HQ
+- Date: 2026-10-12
+- Status: Decided
+- Context: Several sourced companies (Metaview, Tines) were founded abroad but run US go-to-market teams.
+- Decision: The US + Canada rule uses the company's legal / listed HQ country. Legal HQ outside US + Canada is a hard exclusion. Tines (LinkedIn HQ: Boston) stays in; Metaview (London) is kept in the set as the non-US-HQ exclusion test case.
+- Why: Legal HQ is one unambiguous field Clay can return; "where the US team sits" is a judgment call that can't be automated. Territory routing also needs a single HQ state/province.
+- Trade-off accepted: Some foreign-HQ companies with large US sales teams are excluded.
+
+## #28 — Funding outside B–D: Series E+ scored, Series A and below capped at Tier C
+- Date: 2026-10-12
+- Status: Decided
+- Context: Gong (Series E) has the strongest signal in batch 1 — two comp roles citing an ICM platform migration. Flai (Series A) has explicit spreadsheet pain but is early.
+- Decision: Series E and later are scored with 0 funding points (no exclusion), so strong intent can still carry them to Tier A — Gong scores 66 → A. Series A and earlier are scored normally but capped at Tier C (no task, no credits), so the signal is kept on the watch list — Flai scores 58 → C (capped).
+- Why: A late-stage company mid-migration is a live deal and shouldn't be hidden; an early company with real pain is worth watching but not worth rep time yet. Capping instead of excluding keeps the signal history for when it raises a Series B.
+- Trade-off accepted: Series E+ gets no fit credit for funding, so it needs intent to compensate.
+
+## #29 — Score LinkedIn headcount bands when no exact count exists
+- Date: 2026-10-12
+- Status: Decided
+- Context: LinkedIn shows bands (e.g. 1,001–5,000), and those bands don't line up with the spec's 100 / 1,000 / 2,000 cut-offs.
+- Decision: An exact headcount uses the original rule. When only a band is known: 201–500 and 501–1,000 → 8; 51–200 and 1,001–5,000 → 4; 11–50 → 0; 5,001+ → excluded.
+- Why: Gives every band a deterministic score Clay can reproduce, and errs toward partial credit for bands that straddle the ICP edge.
+
+## #30 — Under 100 employees capped at Tier C (same floor as Series A)
+- Date: 2026-10-12
+- Status: Decided
+- Context: Flow Engineering (LinkedIn 11–50, $50M Series B, first Head of RevOps) scored 63 → Tier A, even though the ICP says teams that small can still run comp in spreadsheets.
+- Decision: Extend the #28 floor: under 100 employees (exact count, or LinkedIn band 1–10 / 11–50) is scored but capped at Tier C. The 51–200 band is not capped. Flow Engineering → C (capped).
+- Why: Keeps Tier A consistent with the ICP's own reasoning; one "below-ICP floor" rule covers both funding and size.
+- Trade-off accepted: Fewer Tier A accounts in batch 1 (Gong, Notion), and a just-funded company's band may lag its real size — re-scored every run, so it graduates when LinkedIn catches up.
+
+## #31 — Public companies scored like Series E+ (0 funding points, not excluded)
+- Date: 2026-10-12
+- Status: Decided
+- Context: Ibotta (NYSE: IBTA) was sourced, and the ICP's funding rule (Series B–D or profitable private) didn't say what to do with public companies.
+- Decision: Public companies are scored with 0 funding points and are not excluded, same as Series E+ (#28). PE-owned companies count as "profitable private" (5 points).
+- Why: One consistent rule for everything outside the B–D band; a public company with a strong comp signal (e.g. SOX-driven commission audits) is still a real buyer.
+- Trade-off accepted: Public companies need strong intent to reach Tier B.
+
+## #32 — Social pain signals deferred to the backlog
+- Date: 2026-10-12
+- Status: Deferred (post base build)
+- Context: A founder in the Clay community described a tool that finds buying signals in public conversations (Reddit, LinkedIn, forums, Slack, Discord) instead of funding / hiring. Our hardest sourcing gap is proving a company still runs commissions in spreadsheets, and a post like "month-end commissions in Excel are killing me" proves it directly.
+- Decision: Don't adopt the tool or add the signal to the base build. Log it as a future improvement: a "Pain Post" signal type, sourced from public forums only, scored as "Other" (5) until we measure how often a post can be mapped to an account, then re-weighted (potentially above a comp job post, since it proves the pain).
+- Why: The base build is account-based; social posts are person-level and often anonymous, so account mapping is the unproven step. Several sources (private Slack / Discord communities) forbid scraping members' messages, which conflicts with our data policy (#24).
+- Revisit when: Phases 0–6 ship. Test on public forums first (e.g. r/salesops, r/revops), measure the post → account match rate, and only then decide on weight and tooling.
+
+## #33 — Cut 5 no-signal accounts; backfill with spreadsheet + just-funded companies
+- Date: 2026-10-12
+- Status: Decided
+- Context: After Steps 4–5 the 22 leads scored 3 A / 4 B / 12 C / 3 Excluded. Five Tier C accounts had no live signal or only open sales roles, and no Tier A account runs commissions in spreadsheets — Flozero's best story (sample 8) had no real account.
+- Decision: Cut Ibotta, Perforce, BlueCat, Outreach (no live signals) and 1Password (largest, single weak signal). 17 remain. Backfill 3 accounts that are spreadsheet-only, raised a Series B/C in the last ~90 days, 100+ employees, legal HQ in US/Canada — sourced two ways: recent funding news, and a capped Apify pass over job boards.
+- Why: Dead-weight Tier C rows add no test coverage; the public-company and PE-owned rules are already covered by samples and Bazaarvoice. The backfill fills the missing "greenfield Tier A" path.
+
+## #34 — Test set locked: 21 accounts (5 A / 6 B / 7 C / 3 Excluded)
+- Date: 2026-10-12
+- Status: Decided
+- Context: Step 3 screened the 22 scraped leads, Steps 4–5 added funding and leadership signals, #33 cut 5 and backfilled from both routes (Apify comp-role scan across 500 boards + recent funding news). All four backfill candidates were kept (Keeper Security, Confido, Numeral, Ema); firmographics verified on LinkedIn.
+- Decision: The Phase 3 test set is the 21 accounts in `data/processed/account_set_preview.csv`, produced by `clay/final_set_preview.py`. Tier A: Keeper Security 77, Sierra 71, Gong 66, Notion 63, Confido 61. Tier B: Tines, Numeral, Semperis, Socure, Bazaarvoice, Ema. Tier C: Flow Engineering, Flai, Outmarket (all capped), DoiT, Chainguard, Solink, Tailscale. Excluded: Metaview (HQ), Clipboard Health (staffing), Ambrook (HubSpot).
+- Coverage: every path the taxonomy asks for — strong A, B, C, competitor users (Tines, Semperis, Notion, Bazaarvoice), unknown CRM, three different exclusions, both floor caps, a Canadian account (Tailscale, Solink), Series E+ and PE-owned accounts, and a decay demo (Notion drops A → B on Oct 16).
+- Known gap: no account is *proven* to run commissions on spreadsheets — Keeper is closest (no ICM tool named, Excel/Sheets + macros, "automate manual commission processes") but stays "Unknown" under the explicit-language rule. Phase 3 enrichment is the next chance to confirm it.
+- Credit plan: Clay contact spend on 5 Tier A first, then 6 Tier B — 11 accounts, within the ~80 usable credits after the 20% reserve.
+

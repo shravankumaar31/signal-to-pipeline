@@ -1,0 +1,10 @@
+company,role,role_level,start_or_announce_date,in_180d_window,source,notes
+Sierra,Chief Financial Officer,CFO,2026-08-31,Y,https://sierra.ai/blog/julia-brau-donnelly-joins-sierra,Name kept in source only (company-level signal)
+BlueCat,Chief Financial Officer,CFO,2025-09-24,N,https://www.globenewswire.com/news-release/2025/09/24/3155398/0/en/BlueCat-appoints-Kevin-Shone-as-Chief-Financial-Officer.html,
+Ibotta,Chief Financial Officer,CFO,2025-08-11,N,https://secure.businesswire.com/news/home/20250811800289/en/Ibotta-Names-Matt-Puckett-as-Chief-Financial-Officer,
+Tines,Chief Operating and Financial Officer,CFO,2025-07-28,N,https://www.citybiz.co/article/723327/heather-planishek-joins-tines-as-cfo-coo/,
+DoiT,CRO promoted to COO,CRO-level,2025-07-15,N,https://www.businesswire.com/news/home/20250715911716/en/DoiT-Promotes-Steve-Mills-to-Chief-Operating-Officer,Promotion; CRO seat status unknown
+BlueCat,Chief Revenue Officer,CRO-level,2025-02-26,N,https://bluecatnetworks.com/press/bluecat-appoints-peter-brennan-as-chief-revenue-officer,
+Outreach,Chief Revenue Officer,CRO-level,2025-01-15,N,https://www.geekwire.com/2025/tech-moves-outreach-adds-cmo-and-cro-to-c-suite-aws-vet-joins-synthesia-and-more/,
+Notion,Chief Revenue Officer,CRO-level,2023-03-28,N,https://www.notion.com/blog/erica-anderson-notions-new-cro,
+Solink,Chief Financial Officer (open role),CFO,,N,https://techjobfinder.investottawa.ca/companies/solink/jobs/62086179-chief-financial-officer,Hiring a CFO - not yet a change; re-check when filled

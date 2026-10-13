@@ -1,0 +1,24 @@
+company_token,ats,open_sales_roles,sales_count_complete,comp_role_title,comp_role_posted,comp_role_url,tools_named,pain_language,evidence
+tines,greenhouse,4,Y,"Manager, Sales Compensation",2026-09-30,https://job-boards.greenhouse.io/tines/jobs/6209747004,CaptivateIQ; Salesforce; Salesforce CPQ/DealHub (CPQ migration),N,CaptivateIQ in place; 'fix problems at source rather than in spreadsheets'; CPQ migration experience wanted
+gongio,greenhouse,32,N,"Senior Revenue Operations Analyst, Sales Compensation",2026-10-08,https://job-boards.greenhouse.io/gongio/jobs/4717543006,Salesforce; Xactly/CaptivateIQ/Varicent/Everstage named,Y,'Support the upcoming ICM platform migration'; 'Reduce manual workarounds and spreadsheet dependencies'
+gongio,greenhouse,32,N,GTM Compensation Leader,2026-10-08,https://job-boards.greenhouse.io/gongio/jobs/4706051006,CaptivateIQ/Varicent/Everstage preferred,Y,"'Lead or oversee implementation, migration, or optimization of the platform'"
+Sierra,ashby,6,N,Sales Compensation Analyst,2026-10-06,https://jobs.ashbyhq.com/Sierra/1f8e393a-c50f-4616-b808-521e72d90139,Salesforce (no ICM tool named),N,'Automate manual steps'
+semperis,ashby,0,Y,Sales Compensation Analyst,2026-09-18,https://jobs.ashbyhq.com/semperis/bd084643-8113-42e1-8e3e-046909d02300,Xactly; Salesforce; NetSuite,N,Xactly in place (annual plan implementation in Xactly)
+notion,ashby,10,N,"GTM Compensation Lead, Commercial Operations",2026-08-31,https://jobs.ashbyhq.com/notion/be994bb4-c680-4f57-b3bd-7e689175317f,Everstage,N,Everstage in place
+clipboard,ashby,3,Y,Sales Commission Analyst,2026-08-21,https://jobs.ashbyhq.com/clipboard/aa269dc2-c718-4316-928f-390599546708,none named (spreadsheets),Y,'Keeping the spreadsheets and systems that run them aligned to plan documentation' — healthcare staffing marketplace (exclusion test)
+bazaarvoice,lever,,N,"Director, Sales Commission",2026-09-03,https://jobs.lever.co/bazaarvoice/3ca1c24b-3024-4dac-9e02-20c92f0a0e2f,Everstage,N,"'manage end-to-end execution through our commissions system, Everstage'"
+tailscale,greenhouse,9,N,,,,"CaptivateIQ (from earlier comp post, now closed)",,Comp analyst post no longer live
+chainguard,greenhouse,16,Y,,,,"Everstage (from earlier comp post, now closed)",,Commissions manager post no longer live
+doitintl,greenhouse,10,Y,,,,,,
+solink,ashby,6,Y,,,,,,
+1password,ashby,16,N,,,,,,Comp post page not readable; not in comp-title runs
+socure,ashby,6,Y,,,,,,
+ibotta,ashby,3,Y,,,,,,Senior Sales Operations Analyst open (2026-06-10)
+perforce,lever,0,Y,,,,"CaptivateIQ (from earlier comp post, now closed)",,Only 5 open jobs; comp post closed
+bluecatnetworks,lever,3,N,,,,,,Run hit charge cap at 15 of 30 jobs
+outreach,lever,,N,,,,,,Not scraped (charge cap reached)
+metaview,ashby,14,Y,Finance Manager,2026-08-24,https://jobs.ashbyhq.com/metaview/2eb395c5-1c53-443d-bd1b-4201d2d0468f,none named,N,"'Own payroll and sales commissions, working directly with Sales and RevOps' — commissions owned by finance, no ICM tool named; Strategic Finance role (2026-10-09) owns quota planning. Series C (Oct 2026). HQ to verify (London vs US)."
+flowengineering,ashby,8,Y,Head of Revenue Operations & GTM Engineering,2026-10-05,https://jobs.ashbyhq.com/flowengineering/236c4f86-58f7-461d-a396-d9ae3bff7d0b,none named,N,First RevOps leader after $50M Series B (Oct 2026); 'quota and capacity modeling as the team grows'. Comp tool and CRM not named.
+ambrook,ashby,1,Y,GTM Operations,2026-09-10,https://jobs.ashbyhq.com/ambrook/ee11db89-9f79-4d20-a8c9-e74bbfa51f8b,HubSpot; Excel,N,"'Build process for setting and tracking targets, including commission structure' — HubSpot CRM → exclusion test case. Series B (Aug 2026)."
+outmarket,ashby,1,Y,Strategy & BizOps Senior Manager / Manager,2026-09-11,https://jobs.ashbyhq.com/outmarket/8623e78a-17ba-4791-93a2-5646a982267d,spreadsheet (analysis),N,"Spreadsheet-based analysis, not comp-specific. Series B (Oct 2026)."
+flai,ashby,5,Y,Revenue Operations,2026-10-06,https://jobs.ashbyhq.com/flai/e3029d08-1851-42e8-bd4e-e339462f4125,Salesforce; HubSpot; spreadsheets,Y,'Pay reps right: Own commission tracking so reps get paid accurately and on time'; 'Kill manual work'; 'at home in spreadsheets'. Series A (Oct 2026) — outside the B–D sourcing band; edge case.

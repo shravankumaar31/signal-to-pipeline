@@ -3,7 +3,7 @@
 .DS_Store
 __pycache__/
 .venv/
-# personal data scraped or enriched
-data/raw/*.csv
-data/processed/*.csv
+# personal data (contacts from Clay) never goes in git — company-level data does (decision #24)
+data/**/contacts*
+data/**/*people*
 !data/**/.gitkeep

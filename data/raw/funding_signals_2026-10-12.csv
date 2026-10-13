@@ -1,0 +1,11 @@
+company,round,amount_usd,announced_date,date_precision,in_180d_window,source,notes
+Flow Engineering,Series B,50000000,2026-10-01,day,Y,SiliconANGLE,
+Outmarket,Series B,34500000,2026-10-01,day,Y,https://www.insurancejournal.com/news/west/2026/10/01/887081.htm,Led by SignalFire
+Socure,Growth (post-Series E),156000000,2026-08-27,day,Y,https://raising.fi/news/socure-growth-august-2026,Led by Summit Partners; ~$5.2B valuation reported
+Ambrook,Series B,30000000,2026-08-06,day,Y,https://www.fintechfutures.com/venture-capital-funding/family-business-fintech-ambrook-lands-30m-series-b,Excluded (HubSpot) - recorded for completeness
+Sierra,Series E,950000000,2026-05-15,month,Y,https://ai2.work/blog/sierra-hits-15b-valuation-as-the-enterprise-ai-agent-race-heats-up,Month only (May 2026); mid-month used; half points either way
+Tines,Series C,125000000,2025-02-01,month,N,https://seedtable.com/companies/tines/funding-rounds/series-c-2025-02,
+Chainguard,Series D,356000000,2025-04-23,day,N,https://www.vcaonline.com/news/2025042304/chainguard-raises-356-million-in-series-d-funding-to-be-the-safe-source-for-all-open-source/,$280M growth round Oct 2025 also out of window; a Jul 2026 '$800M' headline is unverified
+Tailscale,Series C,160000000,2025-04-01,month,N,https://thelogic.co/briefing/tailscale-raises-us160m-series-c-for-workplace-vpn/,
+Semperis,Growth,125000000,2024-06-24,day,N,https://www.roi-nj.com/2024/06/24/tech/hoboken-cyber-startup-semperis-secures-125m-in-growth-financing-to-further-invest-in-product-innovation,
+Notion,Secondary (employee tender),270000000,2025-12-01,month,N,https://thebridge.jp/2025/12/notion-tender-offer-11b-valuation-ipo-2026,Secondary sale - not new capital; not a Funding signal
