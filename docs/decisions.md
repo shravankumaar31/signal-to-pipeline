@@ -270,3 +270,23 @@ work around a tool limit, or fix a data-quality problem.
 - Known gap: no account is *proven* to run commissions on spreadsheets — Keeper is closest (no ICM tool named, Excel/Sheets + macros, "automate manual commission processes") but stays "Unknown" under the explicit-language rule. Phase 3 enrichment is the next chance to confirm it.
 - Credit plan: Clay contact spend on 5 Tier A first, then 6 Tier B — 11 accounts, within the ~80 usable credits after the 20% reserve.
 
+## #35 — Fix: Competitor Mention was missing from 5 accounts' scores
+- Date: 2026-10-13
+- Status: Resolved
+- Context: Building the Clay import (one column per signal) exposed that Tines, Semperis, Gong, Notion and Bazaarvoice have a live job post naming a comp tool, but the Phase 2 preview never added the Competitor Mention signal (+5, state signal while the posting is live).
+- Decision: Added it. Gong 66 → 71, Notion 63 → 68, Tines 48 → 53, Semperis 46 → 51, Bazaarvoice 41 → 46. No tier changed. Tailscale, Chainguard and Perforce named tools only in closed posts, so they correctly get nothing. `account_set_preview.csv` and `clay_import_accounts.csv` regenerated.
+- Why it slipped: Phase 2 recorded the tool in `tools_named` (for `Incumbent_Comp_Tool__c`) but treated it only as a fit input, not also as an intent signal.
+- Lesson: flat, one-column-per-signal inputs make missing signals visible — the Clay table uses that shape.
+
+
+## #36 — Scoring lives in Clay as 15 formula columns, validated row-for-row
+- Date: 2026-10-13
+- Status: Decided
+- Context: Option of moving scoring to n8n (single JS copy, daily decay) was considered; the user chose to keep scoring in Clay.
+- Decision: 15 formula columns (Exclusion → Pts × 6 → Fresh Signal → Fit → Intent → Score → Below ICP Floor → Signal Tier → Primary Signal → Score Check), source in `clay/clay_formulas_v2.json`, paste guide in `clay/CLAY_FORMULAS.md`, tested by `clay/test_clay_formulas_v2.js`. In Clay, Score Check = OK on all 21 rows (2026-10-13).
+- What we learned about Clay formulas:
+  - Pasted `{{Column}}` / `{{/Column}}` text never links to a column; only `/`-inserted chips do. So each formula is an arrow function with all columns passed as the last arguments (`COL1..n`) — one chip per column, all in one place.
+  - The checker rejects assignments (`=`), rest params and destructuring; arrow functions, ternaries, `??`, `.reduce` and object-literal lookups are fine.
+  - The AI formula generator repeatedly inverted "is not empty" checks (leading `!`) — generated formulas must be reviewed, which is why we paste tested code instead.
+  - The generator's preview runs on sample data, not table rows — validate on saved columns only.
+- Trade-off accepted: Clay formulas only recompute when a row re-runs, so decay (e.g. Notion A → B on Oct 16) needs a scheduled re-run — to solve in Phase 4. Two copies of the scoring logic (Python reference + Clay JS) are kept in sync by the Score Check column and the Node test.

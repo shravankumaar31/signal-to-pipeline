@@ -1,14 +1,14 @@
 account,hq_country,employees,funding,incumbent,crm,fit,intent,score,tier,primary_signal,reason,breakdown
 Keeper Security,US,501-1000,Profitable private,Unknown,Salesforce,22,55,77,A,Hiring RevOps,,Hiring RevOps 35; Sales Team Growth 20
 Sierra,US,1001-5000,Series E,Unknown,Salesforce,13,58,71,A,Hiring RevOps,,Hiring RevOps 25; Sales Team Growth 10; Funding 10; Leadership Change 13
-Gong,US,1001-5000,Series E,Other,Salesforce,11,55,66,A,Hiring RevOps,,Hiring RevOps 35; Sales Team Growth 20
-Notion,US,501-1000,Series C,Everstage,Salesforce,23,40,63,A,Hiring RevOps,,Hiring RevOps 25; Sales Team Growth 15
+Gong,US,1001-5000,Series E,Other,Salesforce,11,60,71,A,Hiring RevOps,,Hiring RevOps 35; Sales Team Growth 20; Competitor Mention 5
+Notion,US,501-1000,Series C,Everstage,Salesforce,23,45,68,A,Hiring RevOps,,Hiring RevOps 25; Sales Team Growth 15; Competitor Mention 5
 Confido,US,51-200,Series B,Unknown,Salesforce,21,40,61,A,Hiring RevOps,,Funding 20; Hiring RevOps 20
-Tines,US,500,Series C,CaptivateIQ,Salesforce,23,25,48,B,Hiring RevOps,,Hiring RevOps 25
+Tines,US,500,Series C,CaptivateIQ,Salesforce,23,30,53,B,Hiring RevOps,,Hiring RevOps 25; Competitor Mention 5
+Semperis,US,501-1000,Series D,Xactly,Salesforce,21,30,51,B,Hiring RevOps,,Hiring RevOps 25; Competitor Mention 5
 Numeral,US,51-200,Series C,Unknown,Unknown,17,30,47,B,Funding,,Funding 20; Sales Team Growth 10
-Semperis,US,501-1000,Series D,Xactly,Salesforce,21,25,46,B,Hiring RevOps,,Hiring RevOps 25
+Bazaarvoice,US,1001-5000,Profitable private,Everstage,Salesforce,16,30,46,B,Hiring RevOps,,Hiring RevOps 25; Competitor Mention 5
 Socure,US,500,Series E,Unknown,Unknown,13,30,43,B,Funding,,Sales Team Growth 10; Funding 20
-Bazaarvoice,US,1001-5000,Profitable private,Everstage,Salesforce,16,25,41,B,Hiring RevOps,,Hiring RevOps 25
 Ema,US,51-200,Series B,Unknown,Unknown,17,20,37,B,Funding,,Funding 20
 Flow Engineering,US,11-50,Series B,Unknown,Unknown,13,50,63,C (capped),Hiring RevOps,,Hiring RevOps 20; Funding 20; Sales Team Growth 10
 Flai,US,51-200,Series A,Spreadsheets,Salesforce,18,40,58,C (capped),Hiring RevOps,,Hiring RevOps 30; Sales Team Growth 10

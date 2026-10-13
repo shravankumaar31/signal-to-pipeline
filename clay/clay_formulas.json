@@ -1,0 +1,62 @@
+[
+ [
+  "Exclusion",
+  "(() => { const crm = String({{CRM}} || 'Unknown'); if (crm !== 'Salesforce' && crm !== 'Unknown') return 'CRM is ' + crm; if ({{Hard Exclusion}}) return String({{Hard Exclusion}}); const c = String({{HQ Country}} || ''); if (c !== 'US' && c !== 'CA') return 'Legal HQ outside US + Canada (' + c + ')'; const n = Number({{Employees (exact)}}) || 0; const b = String({{Employee Band}} || ''); if (n > 5000 || b === '5001-10000' || b === '10001+') return 'Over 5,000 employees'; return ''; })()"
+ ],
+ [
+  "Pts Hiring",
+  "(() => { if (!{{Hiring Posted}}) return 0; const day = v => { const d = new Date(v); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }; const age = v => Math.round((day(Date.now()) - day(v)) / 864e5); const yes = v => String(v).toLowerCase() === 'true'; const base = (yes({{Hiring Comp Specific}}) ? 25 : 20) + (yes({{Hiring Pain Language}}) ? 10 : 0); const half = Math.floor(base / 2 + 0.5); if ({{Hiring Closed}}) return age({{Hiring Closed}}) <= 30 ? half : 0; const a = age({{Hiring Posted}}); return a <= 45 ? base : a <= 90 ? half : 0; })()"
+ ],
+ [
+  "Pts Sales Growth",
+  "(() => { const n = Number({{Open Sales Roles}}) || 0; return n >= 20 ? 20 : n >= 10 ? 15 : n >= 5 ? 10 : 0; })()"
+ ],
+ [
+  "Pts Funding",
+  "(() => { if (!{{Funding Signal Date}}) return 0; const day = v => { const d = new Date(v); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }; const a = Math.round((day(Date.now()) - day({{Funding Signal Date}})) / 864e5); return a <= 90 ? 20 : a <= 180 ? 10 : 0; })()"
+ ],
+ [
+  "Pts Leadership",
+  "(() => { if (!{{Leadership Date}}) return 0; const day = v => { const d = new Date(v); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }; const a = Math.round((day(Date.now()) - day({{Leadership Date}})) / 864e5); const base = String({{Leadership Role}}) === 'CFO' ? 13 : 20; return a <= 90 ? base : a <= 180 ? Math.floor(base / 2 + 0.5) : 0; })()"
+ ],
+ [
+  "Pts Competitor",
+  "String({{Competitor Mention Live}}).toLowerCase() === 'true' ? 5 : 0"
+ ],
+ [
+  "Pts Other",
+  "(() => { if (!{{Other Signal Date}}) return 0; const day = v => { const d = new Date(v); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }; const a = Math.round((day(Date.now()) - day({{Other Signal Date}})) / 864e5); return a <= 45 ? 5 : a <= 90 ? 3 : 0; })()"
+ ],
+ [
+  "Fresh Signal",
+  "(() => { const day = v => { const d = new Date(v); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }; const age = v => v ? Math.round((day(Date.now()) - day(v)) / 864e5) : 9999; return (Number({{Pts Hiring}}) > 0 && !{{Hiring Closed}} && age({{Hiring Posted}}) <= 45) || Number({{Pts Sales Growth}}) > 0 || (Number({{Pts Funding}}) > 0 && age({{Funding Signal Date}}) <= 90) || (Number({{Pts Leadership}}) > 0 && age({{Leadership Date}}) <= 90) || Number({{Pts Competitor}}) > 0 || (Number({{Pts Other}}) > 0 && age({{Other Signal Date}}) <= 45); })()"
+ ],
+ [
+  "Fit",
+  "(() => { const n = Number({{Employees (exact)}}) || 0; const bands = {'11-50': 0, '51-200': 4, '201-500': 8, '501-1000': 8, '1001-5000': 4}; const hc = n > 0 ? (n >= 200 && n <= 1000 ? 8 : (n >= 100 && n <= 199) || (n >= 1001 && n <= 2000) ? 4 : 0) : (bands[String({{Employee Band}})] || 0); const fund = {'Series B': 8, 'Series C': 8, 'Series D': 6, 'Profitable private': 5}[String({{Funding Stage}})] || 0; const inc = {'Spreadsheets': 10, 'In-house build': 8, 'Unknown': 5}[String({{Incumbent Comp Tool}})] ?? 3; const crm = String({{CRM}}) === 'Salesforce' ? 4 : 0; return hc + fund + inc + crm; })()"
+ ],
+ [
+  "Intent",
+  "Math.min(70, (Number({{Pts Hiring}}) || 0) + (Number({{Pts Sales Growth}}) || 0) + (Number({{Pts Funding}}) || 0) + (Number({{Pts Leadership}}) || 0) + (Number({{Pts Competitor}}) || 0) + (Number({{Pts Other}}) || 0))"
+ ],
+ [
+  "Score",
+  "{{Exclusion}} ? null : Math.min(100, (Number({{Fit}}) || 0) + (Number({{Intent}}) || 0))"
+ ],
+ [
+  "Below ICP Floor",
+  "(() => { const n = Number({{Employees (exact)}}) || 0; const b = String({{Employee Band}} || ''); return ['Pre-seed', 'Seed', 'Series A'].includes(String({{Funding Stage}})) || (n > 0 ? n < 100 : (b === '1-10' || b === '11-50')); })()"
+ ],
+ [
+  "Signal Tier",
+  "(() => { if ({{Exclusion}}) return 'Excluded'; const s = Number({{Score}}) || 0; const fresh = String({{Fresh Signal}}).toLowerCase() === 'true'; const t = s >= 60 && fresh ? 'A' : s >= 35 ? 'B' : 'C'; return String({{Below ICP Floor}}).toLowerCase() === 'true' ? 'C' : t; })()"
+ ],
+ [
+  "Primary Signal",
+  "(() => { if ({{Exclusion}}) return ''; const pts = [['Hiring RevOps', {{Pts Hiring}}], ['Leadership Change', {{Pts Leadership}}], ['Funding', {{Pts Funding}}], ['Sales Team Growth', {{Pts Sales Growth}}], ['Competitor Mention', {{Pts Competitor}}], ['Other', {{Pts Other}}]].map(([k, v]) => [k, Number(v) || 0]); let best = ['', 0]; for (const p of pts) if (p[1] > best[1]) best = p; return best[0]; })()"
+ ],
+ [
+  "Score Check",
+  "(() => { const tier = String({{Signal Tier}}) + (String({{Below ICP Floor}}).toLowerCase() === 'true' && !{{Exclusion}} ? ' (capped)' : ''); const okTier = tier === String({{Expected Tier}}); const okScore = String({{Score}} ?? '') === String({{Expected Score}} ?? ''); const okPrim = {{Exclusion}} ? true : String({{Primary Signal}}) === String({{Expected Primary}}); return okTier && okScore && okPrim ? 'OK' : 'MISMATCH: expected ' + {{Expected Tier}} + ' / ' + {{Expected Score}} + ' / ' + {{Expected Primary}}; })()"
+ ]
+]
