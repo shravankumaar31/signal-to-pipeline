@@ -290,3 +290,30 @@ work around a tool limit, or fix a data-quality problem.
   - The AI formula generator repeatedly inverted "is not empty" checks (leading `!`) — generated formulas must be reviewed, which is why we paste tested code instead.
   - The generator's preview runs on sample data, not table rows — validate on saved columns only.
 - Trade-off accepted: Clay formulas only recompute when a row re-runs, so decay (e.g. Notion A → B on Oct 16) needs a scheduled re-run — to solve in Phase 4. Two copies of the scoring logic (Python reference + Clay JS) are kept in sync by the Score Check column and the Node test.
+
+## #37 — HQ = US / Canada operating hub when one exists (supersedes #27)
+- Date: 2026-10-13
+- Status: Decided (supersedes #27)
+- Context: Clay company enrichment returned Tines → Dublin, IE (LinkedIn check said Boston) and Metaview → San Francisco, US (we had London and excluded it).
+- Decision: When a company has a US or Canadian hub, it counts as US / Canada for the ICP and for territory routing (the hub's state / province). Tines stays in (Boston, MA). Metaview comes back in (San Francisco, CA): Series C, 51–200, Finance Manager role at half points + 14 sales roles → 42, Tier B, primary Sales Team Growth. Test set is now 5 A / 7 B / 7 C / 2 Excluded.
+- Why: Flozero sells to the go-to-market team, which sits in the US hub; a foreign legal entity doesn't change who buys. The non-US-HQ exclusion stays tested by scorer sample 10.
+- Trade-off accepted: "Has a US hub" is a judgment call that Clay can't return directly — Clay's Country field reflects the primary LinkedIn location, so conflicts are resolved by a human.
+
+## #38 — Headcount: hand-verified value wins; Clay count is a flagged cross-check
+- Date: 2026-10-13
+- Status: Decided
+- Context: Clay's Employee Count and Size band disagreed with each other and with the LinkedIn check: Notion 7,137 (band 501–1,000 — would trip the over-5,000 exclusion), Confido Size 11–50 vs count 114 (Size would cap it at Tier C), Flai 29 vs 51–200, Ema 311 vs 51–200, Outmarket 60 vs 11–50. Gong 3,587 agreed with everything.
+- Decision: Score from the hand-verified headcount (imported Employees / Employee Band). Clay's count goes to a `Headcount Conflict` column that flags disagreement (outside the verified band, or under ½ / over 2× an exact count) for human review. Never score from Clay's Size band.
+- Why: Clay's count appears to include people who merely list the company on LinkedIn (inflates community-heavy brands like Notion), and Size bands go stale after fast growth. One automated number would have wrongly excluded Notion or capped Confido.
+- In production (no human check): a flagged row keeps the last verified value and gets a "Manual Research Needed" reason instead of silently changing tier.
+- Cost: Enrich company on 21 rows = 10.5 credits (0.5 / row, as listed). Balance 189.5.
+
+## #39 — CRM detection with BuiltWith; HubSpot website tools alone ≠ HubSpot CRM
+- Date: 2026-10-13
+- Status: Decided
+- Context: 10 non-excluded accounts had CRM = Unknown (0 fit points). Tested BuiltWith "Find technology stack" (1 credit/row) with a keyword filter (Salesforce, HubSpot, Pardot, Marketo, Dynamics, Zoho, Pipedrive), first on 3 rows including a known-Salesforce control (Keeper), then on the remaining 8 — 11 credits total, balance 178.5.
+- Result: Salesforce detected at Tailscale, DoiT, Solink, Socure, Numeral (plus the Keeper control). HubSpot website tools only at Flow Engineering, Metaview, Chainguard, Outmarket, Ema. Evidence in `data/raw/crm_detection_2026-10-13.csv`.
+- Decision: `CRM Final` = imported CRM when known; else Salesforce if core Salesforce tech is detected (My Salesforce, Salesforce SPF, Pardot…; not Commerce Cloud, Tableau, MuleSoft, Heroku, Slack, Marketing Cloud or Audience Studio); else Unknown. HubSpot website tools alone stay Unknown with a "Verify CRM" flag — not an exclusion (option a).
+- Why: BuiltWith sees website tags, not the CRM; HubSpot forms / analytics sit on top of Salesforce at many companies (Numeral, Tailscale and DoiT all show both). Excluding 5 accounts on indirect evidence would contradict "only a confirmed non-Salesforce CRM excludes".
+- Impact: +4 fit for 5 accounts. DoiT 33 → 37 and Solink 31 → 35 move C → B; Tailscale 29 → 33, Socure 43 → 47, Numeral 47 → 51. Test set now 5 A / 9 B / 5 C / 2 Excluded.
+

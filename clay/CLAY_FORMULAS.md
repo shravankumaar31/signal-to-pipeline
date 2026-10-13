@@ -2,6 +2,8 @@
 
 **How:** Add column → Formula. Paste the formula into the formula box, then replace each `COLn` at the **end** with a column chip (select `COLn`, delete, type `/`, pick the column). Check **Referenced columns** shows the right count and there is no red error, rename the column to the exact name below, then **Save**.
 
+Clay's formula checker rejects assignments (`=`), rest parameters (`...`) and destructuring, so none are used.
+
 Create them **in order** — later columns use earlier ones. Tested with `node clay/test_clay_formulas_v2.js` (all 21 rows match the reference scorer, with values passed as text and as typed numbers/booleans).
 
 ## 1. Exclusion
@@ -25,7 +27,7 @@ Replace: `COL1` → **Hiring Posted**, `COL2` → **Hiring Comp Specific**, `COL
 Replace: `COL1` → **Open Sales Roles**
 
 ```
-(n => (n = Number(n) || 0) >= 20 ? 20 : n >= 10 ? 15 : n >= 5 ? 10 : 0)(COL1)
+(n => (Number(n) || 0) >= 20 ? 20 : (Number(n) || 0) >= 10 ? 15 : (Number(n) || 0) >= 5 ? 10 : 0)(COL1)
 ```
 
 ## 4. Pts Funding
@@ -81,7 +83,7 @@ Replace: `COL1` → **Employees (exact)**, `COL2` → **Employee Band**, `COL3` 
 Replace: `COL1` → **Pts Hiring**, `COL2` → **Pts Sales Growth**, `COL3` → **Pts Funding**, `COL4` → **Pts Leadership**, `COL5` → **Pts Competitor**, `COL6` → **Pts Other**
 
 ```
-((...p) => Math.min(70, p.reduce((s, v) => s + (Number(v) || 0), 0)))(COL1, COL2, COL3, COL4, COL5, COL6)
+((a, b, c, d, e, f) => Math.min(70, [a, b, c, d, e, f].reduce((s, v) => s + (Number(v) || 0), 0)))(COL1, COL2, COL3, COL4, COL5, COL6)
 ```
 
 ## 11. Score
@@ -113,7 +115,7 @@ Replace: `COL1` → **Exclusion**, `COL2` → **Below ICP Floor**, `COL3` → **
 Replace: `COL1` → **Exclusion**, `COL2` → **Pts Hiring**, `COL3` → **Pts Leadership**, `COL4` → **Pts Funding**, `COL5` → **Pts Sales Growth**, `COL6` → **Pts Competitor**, `COL7` → **Pts Other**
 
 ```
-((ex, h, l, f, s, c, o) => ex ? "" : [["Hiring RevOps", h], ["Leadership Change", l], ["Funding", f], ["Sales Team Growth", s], ["Competitor Mention", c], ["Other", o]].reduce((b, [k, v]) => (Number(v) || 0) > b[1] ? [k, Number(v) || 0] : b, ["", 0])[0])(COL1, COL2, COL3, COL4, COL5, COL6, COL7)
+((ex, h, l, f, s, c, o) => ex ? "" : [["Hiring RevOps", h], ["Leadership Change", l], ["Funding", f], ["Sales Team Growth", s], ["Competitor Mention", c], ["Other", o]].reduce((b, p) => (Number(p[1]) || 0) > b[1] ? [p[0], Number(p[1]) || 0] : b, ["", 0])[0])(COL1, COL2, COL3, COL4, COL5, COL6, COL7)
 ```
 
 ## 15. Score Check
@@ -125,4 +127,33 @@ Replace: `COL1` → **Exclusion**, `COL2` → **Signal Tier**, `COL3` → **Belo
 ```
 
 ## Expected after column 15
-`Score Check` = **OK** on all 21 rows (on 2026-10-13 through 2026-10-15; from Oct 16 Notion and from Oct 18 Bazaarvoice decay — expected, since the Expected columns are frozen).
+`Score Check` = **OK** on all 21 rows (through 2026-10-15; from Oct 16 Notion and from Oct 18 Bazaarvoice decay — expected, since the Expected columns are frozen).
+
+## 16. Headcount Conflict (data quality — not used in scoring)
+Flags rows where Clay's enriched Employee Count disagrees with the hand-verified headcount (outside the verified band, or under half / over double the exact count). Scoring keeps using the verified values (#38).
+
+Replace: `COL1` → **Employee Count**, `COL2` → **Employees (exact)**, `COL3` → **Employee Band**
+
+```
+((count, exact, band) => (c => !c ? "" : (Number(exact) || 0) > 0 ? (c < Number(exact) / 2 || c > Number(exact) * 2 ? "Clay " + c + " vs verified " + exact : "") : (r => !r ? "" : (c < r[0] || c > r[1]) ? "Clay " + c + " vs verified band " + band : "")({"11-50": [11, 50], "51-200": [51, 200], "201-500": [201, 500], "501-1000": [501, 1000], "1001-5000": [1001, 5000]}[String(band)]))(Number(count) || 0))(COL1, COL2, COL3)
+```
+
+Expected flags (2026-10-13): Notion, Flai, Clipboard Health, Outmarket, Ema.
+
+## 17. CRM Final (used by Exclusion and Fit)
+Imported CRM when known; otherwise Salesforce if BuiltWith finds core Salesforce tech (My Salesforce, Salesforce SPF, Pardot, …; Commerce Cloud, Tableau, MuleSoft, Heroku, Slack, Marketing Cloud and Audience Studio don't count); otherwise Unknown. HubSpot website tools alone stay Unknown (#39).
+
+Replace: `COL1` → **CRM**, `COL2` → **Technologiesfound**
+
+```
+((imported, tech) => String(imported || "Unknown") !== "Unknown" ? String(imported) : (l => l.some(x => x === "my salesforce" || x.startsWith("pardot") || (x.startsWith("salesforce") && !/commerce|tableau|mulesoft|heroku|slack|marketing cloud|audience studio/.test(x))) ? "Salesforce" : "Unknown")(String(tech || "").toLowerCase().split(",").map(x => x.trim())))(COL1, COL2)
+```
+
+Then re-link **Exclusion** `COL1` and **Fit** `COL5` from **CRM** to **CRM Final**.
+
+## 18. CRM Evidence (data quality)
+Replace: `COL1` → **Technologiesfound**
+
+```
+(tech => (l => l.some(x => x === "my salesforce" || x.startsWith("pardot") || (x.startsWith("salesforce") && !/commerce|tableau|mulesoft|heroku|slack|marketing cloud|audience studio/.test(x))) ? "Salesforce detected" : l.some(x => x.startsWith("hubspot")) ? "Verify CRM: HubSpot website tools only" : l.filter(x => x).length ? "Verify CRM: " + l.filter(x => x).join(", ") : "")(String(tech || "").toLowerCase().split(",").map(x => x.trim())))(COL1)
+```

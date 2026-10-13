@@ -25,7 +25,7 @@
   "columns": [
    "Open Sales Roles"
   ],
-  "formula": "(n => (n = Number(n) || 0) >= 20 ? 20 : n >= 10 ? 15 : n >= 5 ? 10 : 0)(COL1)"
+  "formula": "(n => (Number(n) || 0) >= 20 ? 20 : (Number(n) || 0) >= 10 ? 15 : (Number(n) || 0) >= 5 ? 10 : 0)(COL1)"
  },
  {
   "name": "Pts Funding",
@@ -90,7 +90,7 @@
    "Pts Competitor",
    "Pts Other"
   ],
-  "formula": "((...p) => Math.min(70, p.reduce((s, v) => s + (Number(v) || 0), 0)))(COL1, COL2, COL3, COL4, COL5, COL6)"
+  "formula": "((a, b, c, d, e, f) => Math.min(70, [a, b, c, d, e, f].reduce((s, v) => s + (Number(v) || 0), 0)))(COL1, COL2, COL3, COL4, COL5, COL6)"
  },
  {
   "name": "Score",
@@ -131,7 +131,7 @@
    "Pts Competitor",
    "Pts Other"
   ],
-  "formula": "((ex, h, l, f, s, c, o) => ex ? \"\" : [[\"Hiring RevOps\", h], [\"Leadership Change\", l], [\"Funding\", f], [\"Sales Team Growth\", s], [\"Competitor Mention\", c], [\"Other\", o]].reduce((b, [k, v]) => (Number(v) || 0) > b[1] ? [k, Number(v) || 0] : b, [\"\", 0])[0])(COL1, COL2, COL3, COL4, COL5, COL6, COL7)"
+  "formula": "((ex, h, l, f, s, c, o) => ex ? \"\" : [[\"Hiring RevOps\", h], [\"Leadership Change\", l], [\"Funding\", f], [\"Sales Team Growth\", s], [\"Competitor Mention\", c], [\"Other\", o]].reduce((b, p) => (Number(p[1]) || 0) > b[1] ? [p[0], Number(p[1]) || 0] : b, [\"\", 0])[0])(COL1, COL2, COL3, COL4, COL5, COL6, COL7)"
  },
  {
   "name": "Score Check",
@@ -146,5 +146,36 @@
    "Primary Signal"
   ],
   "formula": "((yes, ex, tier, floor, score, eTier, eScore, ePrim, prim) => (t => t === String(eTier ?? \"\") && String(score ?? \"\") === String(eScore ?? \"\") && (ex || String(prim ?? \"\") === String(ePrim ?? \"\")) ? \"OK\" : \"MISMATCH: expected \" + eTier + \" / \" + eScore + \" / \" + ePrim)(String(tier) + (yes(floor) && !ex ? \" (capped)\" : \"\")))(v => v === true || String(v).toLowerCase() === \"true\", COL1, COL2, COL3, COL4, COL5, COL6, COL7, COL8)"
+ },
+ {
+  "name": "Headcount Conflict",
+  "columns": [
+   "Employee Count",
+   "Employees (exact)",
+   "Employee Band"
+  ],
+  "formula": "((count, exact, band) => (c => !c ? \"\" : (Number(exact) || 0) > 0 ? (c < Number(exact) / 2 || c > Number(exact) * 2 ? \"Clay \" + c + \" vs verified \" + exact : \"\") : (r => !r ? \"\" : (c < r[0] || c > r[1]) ? \"Clay \" + c + \" vs verified band \" + band : \"\")({\"11-50\": [11, 50], \"51-200\": [51, 200], \"201-500\": [201, 500], \"501-1000\": [501, 1000], \"1001-5000\": [1001, 5000]}[String(band)]))(Number(count) || 0))(COL1, COL2, COL3)"
+ },
+ {
+  "name": "CRM Detected",
+  "columns": [
+   "Technologiesfound"
+  ],
+  "formula": "(tech => (l => l.some(x => x === \"my salesforce\" || x.startsWith(\"pardot\") || (x.startsWith(\"salesforce\") && ![\"commerce\", \"tableau\", \"mulesoft\", \"heroku\", \"slack\", \"marketing cloud\"].some(w => x.includes(w)))) ? \"Salesforce\" : l.some(x => x.startsWith(\"hubspot\")) ? \"HubSpot (marketing only) - verify CRM\" : l.filter(x => x).length ? \"Other: \" + l.filter(x => x).join(\", \") : \"Not detected\")(String(tech || \"\").toLowerCase().split(\",\").map(x => x.trim())))(COL1)"
+ },
+ {
+  "name": "CRM Final",
+  "columns": [
+   "CRM",
+   "Technologiesfound"
+  ],
+  "formula": "((imported, tech) => String(imported || \"Unknown\") !== \"Unknown\" ? String(imported) : (l => l.some(x => x === \"my salesforce\" || x.startsWith(\"pardot\") || (x.startsWith(\"salesforce\") && !/commerce|tableau|mulesoft|heroku|slack|marketing cloud|audience studio/.test(x))) ? \"Salesforce\" : \"Unknown\")(String(tech || \"\").toLowerCase().split(\",\").map(x => x.trim())))(COL1, COL2)"
+ },
+ {
+  "name": "CRM Evidence",
+  "columns": [
+   "Technologiesfound"
+  ],
+  "formula": "(tech => (l => l.some(x => x === \"my salesforce\" || x.startsWith(\"pardot\") || (x.startsWith(\"salesforce\") && !/commerce|tableau|mulesoft|heroku|slack|marketing cloud|audience studio/.test(x))) ? \"Salesforce detected\" : l.some(x => x.startsWith(\"hubspot\")) ? \"Verify CRM: HubSpot website tools only\" : l.filter(x => x).length ? \"Verify CRM: \" + l.filter(x => x).join(\", \") : \"\")(String(tech || \"\").toLowerCase().split(\",\").map(x => x.trim())))(COL1)"
  }
 ]

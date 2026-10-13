@@ -20,7 +20,7 @@ to already be locked into an enterprise tool?**
 | Headcount (proxy) | 100–2,000 employees (under 100 capped at Tier C) | Rep count is hard to get directly; headcount plus open sales roles stands in for it |
 | Funding stage | Series B–D, or profitable private (Series E+ and public companies scored with 0 funding points; Series A and below capped at Tier C) | Post-B is when sales scales and the first RevOps / comp hire happens |
 | CRM | **Salesforce only** | Flozero's integration story for this project; detected from `Tech_Stack__c` |
-| Geography | US + Canada, judged by **legal HQ** | One market; California's written-commission-agreement requirement adds a compliance angle |
+| Geography | US + Canada, judged by the **US / Canada operating hub** when one exists (decision #37) | One market; California's written-commission-agreement requirement adds a compliance angle |
 | Incumbent comp tool | Spreadsheets, in-house, **or a competitor** | Competitor users are in the ICP as displacement targets, at lower priority than spreadsheet users (weighted in section 3) |
 
 ### Hard exclusions (never scored, never enriched past firmographics)
@@ -30,7 +30,7 @@ to already be locked into an enterprise tool?**
 | Competitors: comp, CPQ and planning vendors | Domain on a maintained competitor list |
 | No quota-carrying sales (product-led only, consumer) | No sales roles open and none on the team |
 | Over 5,000 employees | Headcount (or LinkedIn band 5,001+) |
-| Legal HQ outside US + Canada | HQ country (legal entity, not the location of the US sales team) |
+| No US / Canada HQ or hub | HQ country — a company with a US or Canadian hub counts as US / Canada (#37) |
 | Staffing / recruiting agencies | Industry |
 | CRM is confirmed **not** Salesforce (e.g. HubSpot) | `Tech_Stack__c` |
 
