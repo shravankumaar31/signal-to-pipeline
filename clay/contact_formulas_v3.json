@@ -1,0 +1,45 @@
+[
+  {
+    "table": "clay_accounts_v1",
+    "name": "Primary Contact Idx",
+    "columns": [
+      "Find contacts at company \u2192 people",
+      "HQ Country"
+    ],
+    "formula": "((people, hq, persona, seniority) => people.length === 0 ? -1 : (key => people.reduce((b, p, i) => key(p) < key(people[b]) ? i : b, 0))(p => (t => ({\"Head of RevOps\": 1, \"Sales Ops / Comp Manager\": 2, \"CRO / VP Sales\": 3, \"CFO / VP Finance\": 4, \"Other\": 9})[persona(t)] * 100 + (String((p && p.country) || \"\").toUpperCase() === String(hq || \"\").toUpperCase() ? 0 : 10) + ({\"C-Level\": 0, \"VP\": 1, \"Director\": 2, \"Manager\": 3, \"IC\": 4})[seniority(t)])(String((p && p.title) || \"\").toLowerCase())))((v => Array.isArray(v) ? v : [])(COL1), COL2, (t => /commission|compensation|incentive/.test(t) ? \"Sales Ops / Comp Manager\" : /revenue operations|revops|gtm operations|go-to-market operations/.test(t) ? (/head|vp|vice president|director|chief|svp/.test(t) ? \"Head of RevOps\" : \"Sales Ops / Comp Manager\") : /sales operations|sales ops/.test(t) ? \"Sales Ops / Comp Manager\" : /chief revenue|\\bcro\\b/.test(t) || (/sales/.test(t) && /vp|vice president|head|chief|svp/.test(t)) ? \"CRO / VP Sales\" : /financ|\\bcfo\\b/.test(t) ? \"CFO / VP Finance\" : \"Other\"), (t => /chief|\\bcfo\\b|\\bcro\\b|\\bceo\\b|\\bcoo\\b/.test(t) ? \"C-Level\" : /\\bvp\\b|vice president|\\bsvp\\b|\\bevp\\b/.test(t) ? \"VP\" : /head|director/.test(t) ? \"Director\" : /manager|\\blead\\b/.test(t) ? \"Manager\" : \"IC\"))"
+  },
+  {
+    "table": "clay_accounts_v1",
+    "name": "Primary Contact LinkedIn",
+    "columns": [
+      "Find contacts at company \u2192 people",
+      "Primary Contact Idx"
+    ],
+    "formula": "((people, i) => i >= 0 && people[i] ? String(people[i].url || \"\") : \"\")((v => Array.isArray(v) ? v : [])(COL1), Number(COL2))"
+  },
+  {
+    "table": "clay_contacts_v1",
+    "name": "Contact Persona",
+    "columns": [
+      "Title"
+    ],
+    "formula": "(t => t ? (t => /commission|compensation|incentive/.test(t) ? \"Sales Ops / Comp Manager\" : /revenue operations|revops|gtm operations|go-to-market operations/.test(t) ? (/head|vp|vice president|director|chief|svp/.test(t) ? \"Head of RevOps\" : \"Sales Ops / Comp Manager\") : /sales operations|sales ops/.test(t) ? \"Sales Ops / Comp Manager\" : /chief revenue|\\bcro\\b/.test(t) || (/sales/.test(t) && /vp|vice president|head|chief|svp/.test(t)) ? \"CRO / VP Sales\" : /financ|\\bcfo\\b/.test(t) ? \"CFO / VP Finance\" : \"Other\")(String(t).toLowerCase()) : \"\")(COL1)"
+  },
+  {
+    "table": "clay_contacts_v1",
+    "name": "Contact Seniority",
+    "columns": [
+      "Title"
+    ],
+    "formula": "(t => t ? (t => /chief|\\bcfo\\b|\\bcro\\b|\\bceo\\b|\\bcoo\\b/.test(t) ? \"C-Level\" : /\\bvp\\b|vice president|\\bsvp\\b|\\bevp\\b/.test(t) ? \"VP\" : /head|director/.test(t) ? \"Director\" : /manager|\\blead\\b/.test(t) ? \"Manager\" : \"IC\")(String(t).toLowerCase()) : \"\")(COL1)"
+  },
+  {
+    "table": "clay_contacts_v1",
+    "name": "Is Primary",
+    "columns": [
+      "LinkedIn URL",
+      "Primary Contact LinkedIn"
+    ],
+    "formula": "((a, b) => a !== \"\" && a === b)(String(COL1 || \"\").toLowerCase().replace(/\\/+$/, \"\"), String(COL2 || \"\").toLowerCase().replace(/\\/+$/, \"\"))"
+  }
+]

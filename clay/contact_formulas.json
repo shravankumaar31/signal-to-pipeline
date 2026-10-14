@@ -1,0 +1,64 @@
+[
+ {
+  "name": "Primary Contact Idx",
+  "columns": [
+   "Find contacts at company",
+   "HQ Country"
+  ],
+  "formula": "((people, f, persona, seniority, hq) => people.length === 0 ? -1 : (key => people.reduce((b, p, i) => key(p) < key(people[b]) ? i : b, 0))(p => (t => ({\"Head of RevOps\": 1, \"Sales Ops / Comp Manager\": 2, \"CRO / VP Sales\": 3, \"CFO / VP Finance\": 4, \"Other\": 9})[persona(t)] * 100 + (String(f(p, \"country\") || \"\").toUpperCase() === String(hq || \"\").toUpperCase() ? 0 : 10) + ({\"C-Level\": 0, \"VP\": 1, \"Director\": 2, \"Manager\": 3, \"IC\": 4})[seniority(t)])(String(f(p, \"title\") || \"\").toLowerCase())))((v => (f => (o => f(o, \"people\") || [])(typeof v === \"string\" ? JSON.parse(v) : v))((o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)]))(COL1), (o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)], (t => /commission|compensation|incentive/.test(t) ? \"Sales Ops / Comp Manager\" : /revenue operations|revops|gtm operations|go-to-market operations/.test(t) ? (/head|vp|vice president|director|chief|svp/.test(t) ? \"Head of RevOps\" : \"Sales Ops / Comp Manager\") : /sales operations|sales ops/.test(t) ? \"Sales Ops / Comp Manager\" : /chief revenue|\\bcro\\b/.test(t) || (/sales/.test(t) && /vp|vice president|head|chief|svp/.test(t)) ? \"CRO / VP Sales\" : /financ|\\bcfo\\b/.test(t) ? \"CFO / VP Finance\" : \"Other\"), (t => /chief|\\bcfo\\b|\\bcro\\b|\\bceo\\b|\\bcoo\\b/.test(t) ? \"C-Level\" : /\\bvp\\b|vice president|\\bsvp\\b|\\bevp\\b/.test(t) ? \"VP\" : /head|director/.test(t) ? \"Director\" : /manager|\\blead\\b/.test(t) ? \"Manager\" : \"IC\"), COL2)"
+ },
+ {
+  "name": "Contact First Name",
+  "columns": [
+   "Find contacts at company",
+   "Primary Contact Idx"
+  ],
+  "formula": "((people, f, i) => i >= 0 && people[i] ? String(f(people[i], \"firstname\") || \"\") : \"\")((v => (f => (o => f(o, \"people\") || [])(typeof v === \"string\" ? JSON.parse(v) : v))((o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)]))(COL1), (o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)], Number(COL2))"
+ },
+ {
+  "name": "Contact Last Name",
+  "columns": [
+   "Find contacts at company",
+   "Primary Contact Idx"
+  ],
+  "formula": "((people, f, i) => i >= 0 && people[i] ? String(f(people[i], \"lastname\") || \"\") : \"\")((v => (f => (o => f(o, \"people\") || [])(typeof v === \"string\" ? JSON.parse(v) : v))((o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)]))(COL1), (o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)], Number(COL2))"
+ },
+ {
+  "name": "Contact Title",
+  "columns": [
+   "Find contacts at company",
+   "Primary Contact Idx"
+  ],
+  "formula": "((people, f, i) => i >= 0 && people[i] ? String(f(people[i], \"title\") || \"\") : \"\")((v => (f => (o => f(o, \"people\") || [])(typeof v === \"string\" ? JSON.parse(v) : v))((o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)]))(COL1), (o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)], Number(COL2))"
+ },
+ {
+  "name": "Contact LinkedIn",
+  "columns": [
+   "Find contacts at company",
+   "Primary Contact Idx"
+  ],
+  "formula": "((people, f, i) => i >= 0 && people[i] ? String(f(people[i], \"url\") || \"\") : \"\")((v => (f => (o => f(o, \"people\") || [])(typeof v === \"string\" ? JSON.parse(v) : v))((o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)]))(COL1), (o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)], Number(COL2))"
+ },
+ {
+  "name": "Contact Country",
+  "columns": [
+   "Find contacts at company",
+   "Primary Contact Idx"
+  ],
+  "formula": "((people, f, i) => i >= 0 && people[i] ? String(f(people[i], \"country\") || \"\") : \"\")((v => (f => (o => f(o, \"people\") || [])(typeof v === \"string\" ? JSON.parse(v) : v))((o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)]))(COL1), (o, k) => o == null ? undefined : o[Object.keys(o).find(x => x.toLowerCase().replace(/[^a-z]/g, \"\") === k)], Number(COL2))"
+ },
+ {
+  "name": "Contact Persona",
+  "columns": [
+   "Contact Title"
+  ],
+  "formula": "(t => t ? (t => /commission|compensation|incentive/.test(t) ? \"Sales Ops / Comp Manager\" : /revenue operations|revops|gtm operations|go-to-market operations/.test(t) ? (/head|vp|vice president|director|chief|svp/.test(t) ? \"Head of RevOps\" : \"Sales Ops / Comp Manager\") : /sales operations|sales ops/.test(t) ? \"Sales Ops / Comp Manager\" : /chief revenue|\\bcro\\b/.test(t) || (/sales/.test(t) && /vp|vice president|head|chief|svp/.test(t)) ? \"CRO / VP Sales\" : /financ|\\bcfo\\b/.test(t) ? \"CFO / VP Finance\" : \"Other\")(String(t).toLowerCase()) : \"\")(COL1)"
+ },
+ {
+  "name": "Contact Seniority",
+  "columns": [
+   "Contact Title"
+  ],
+  "formula": "(t => t ? (t => /chief|\\bcfo\\b|\\bcro\\b|\\bceo\\b|\\bcoo\\b/.test(t) ? \"C-Level\" : /\\bvp\\b|vice president|\\bsvp\\b|\\bevp\\b/.test(t) ? \"VP\" : /head|director/.test(t) ? \"Director\" : /manager|\\blead\\b/.test(t) ? \"Manager\" : \"IC\")(String(t).toLowerCase()) : \"\")(COL1)"
+ }
+]

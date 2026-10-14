@@ -317,3 +317,13 @@ work around a tool limit, or fix a data-quality problem.
 - Why: BuiltWith sees website tags, not the CRM; HubSpot forms / analytics sit on top of Salesforce at many companies (Numeral, Tailscale and DoiT all show both). Excluding 5 accounts on indirect evidence would contradict "only a confirmed non-Salesforce CRM excludes".
 - Impact: +4 fit for 5 accounts. DoiT 33 → 37 and Solink 31 → 35 move C → B; Tailscale 29 → 33, Socure 43 → 47, Numeral 47 → 51. Test set now 5 A / 9 B / 5 C / 2 Excluded.
 
+
+## #40 — Two Clay tables: accounts (one row per company) and contacts (one row per person)
+- Date: 2026-10-14
+- Status: Decided
+- Context: The accounts table reached 71 columns, and contacts were going to be flattened into it one person per account.
+- Decision: New table `clay_contacts_v1`, filled from `clay_accounts_v1` by *Send table data* in "send row for each item in a list" mode, using the Find contacts `people` list. Account columns sent: Account Name, Domain (join key), HQ Country, Signal Tier, Score, Primary Signal, Primary Contact LinkedIn. "Update existing rows on re-run" is ON, so a re-send refreshes rows without duplicating them. Auto-run is OFF, and the run condition is Primary Contact Idx ≥ 0.
+- Primary contact: Clay formulas can't compare rows, so the accounts table chooses the primary (`Primary Contact Idx` → `Primary Contact LinkedIn`). The contacts table flags it with `Is Primary` = its own LinkedIn URL matches the account's primary (lower-cased, trailing slash ignored).
+- Why: Matches Salesforce (Account vs Contact objects), allows a 2nd Tier A contact later, and lets email enrichment run per person, only where Is Primary and Tier is A/B. Reuses the people already found, with no new search.
+- Lesson: Clay's formula checker also rejects `typeof`; use `Array.isArray(v) ? v : []`.
+- Formulas: `clay/contact_formulas_v3.json`, `clay/CLAY_CONTACT_FORMULAS.md` (v1/v2 superseded).
