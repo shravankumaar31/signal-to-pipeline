@@ -2,12 +2,14 @@
 
 Accounts table picks the primary contact; contacts table (one row per person, filled by *Send table data*) flags it. Replace each `COLn` with a `/` column chip.
 
+Ranking (v3.1): persona → HQ-country match → seniority → title names RevOps/commission/compensation. Sales Engineering / Enablement / Development titles are persona Other.
+
 ## Primary Contact Idx (clay_accounts_v1)
 
 Columns: `COL1` → Find contacts at company → people, `COL2` → HQ Country
 
 ```
-((people, hq, persona, seniority) => people.length === 0 ? -1 : (key => people.reduce((b, p, i) => key(p) < key(people[b]) ? i : b, 0))(p => (t => ({"Head of RevOps": 1, "Sales Ops / Comp Manager": 2, "CRO / VP Sales": 3, "CFO / VP Finance": 4, "Other": 9})[persona(t)] * 100 + (String((p && p.country) || "").toUpperCase() === String(hq || "").toUpperCase() ? 0 : 10) + ({"C-Level": 0, "VP": 1, "Director": 2, "Manager": 3, "IC": 4})[seniority(t)])(String((p && p.title) || "").toLowerCase())))((v => Array.isArray(v) ? v : [])(COL1), COL2, (t => /commission|compensation|incentive/.test(t) ? "Sales Ops / Comp Manager" : /revenue operations|revops|gtm operations|go-to-market operations/.test(t) ? (/head|vp|vice president|director|chief|svp/.test(t) ? "Head of RevOps" : "Sales Ops / Comp Manager") : /sales operations|sales ops/.test(t) ? "Sales Ops / Comp Manager" : /chief revenue|\bcro\b/.test(t) || (/sales/.test(t) && /vp|vice president|head|chief|svp/.test(t)) ? "CRO / VP Sales" : /financ|\bcfo\b/.test(t) ? "CFO / VP Finance" : "Other"), (t => /chief|\bcfo\b|\bcro\b|\bceo\b|\bcoo\b/.test(t) ? "C-Level" : /\bvp\b|vice president|\bsvp\b|\bevp\b/.test(t) ? "VP" : /head|director/.test(t) ? "Director" : /manager|\blead\b/.test(t) ? "Manager" : "IC"))
+((people, hq, persona, seniority) => people.length === 0 ? -1 : (key => people.reduce((b, p, i) => key(p) < key(people[b]) ? i : b, 0))(p => (t => ({"Head of RevOps": 1, "Sales Ops / Comp Manager": 2, "CRO / VP Sales": 3, "CFO / VP Finance": 4, "Other": 9})[persona(t)] * 1000 + (String((p && p.country) || "").toUpperCase() === String(hq || "").toUpperCase() ? 0 : 100) + ({"C-Level": 0, "VP": 1, "Director": 2, "Manager": 3, "IC": 4})[seniority(t)] * 10 + (/revenue operations|revops|commission|compensation/.test(t) ? 0 : 1))(String((p && p.title) || "").toLowerCase())))((v => Array.isArray(v) ? v : [])(COL1), COL2, (t => /commission|compensation|incentive/.test(t) ? "Sales Ops / Comp Manager" : /revenue operations|revops|gtm operations|go-to-market operations/.test(t) ? (/head|vp|vice president|director|chief|svp/.test(t) ? "Head of RevOps" : "Sales Ops / Comp Manager") : /sales operations|sales ops/.test(t) ? "Sales Ops / Comp Manager" : /engineer|enablement|development/.test(t) ? "Other" : /chief revenue|\bcro\b/.test(t) || (/sales/.test(t) && /vp|vice president|head|chief|svp/.test(t)) ? "CRO / VP Sales" : /financ|\bcfo\b/.test(t) ? "CFO / VP Finance" : "Other"), (t => /chief|\bcfo\b|\bcro\b|\bceo\b|\bcoo\b/.test(t) ? "C-Level" : /\bvp\b|vice president|\bsvp\b|\bevp\b/.test(t) ? "VP" : /head|director/.test(t) ? "Director" : /manager|\blead\b/.test(t) ? "Manager" : "IC"))
 ```
 
 ## Primary Contact LinkedIn (clay_accounts_v1)
@@ -23,7 +25,7 @@ Columns: `COL1` → Find contacts at company → people, `COL2` → Primary Cont
 Columns: `COL1` → Title
 
 ```
-(t => t ? (t => /commission|compensation|incentive/.test(t) ? "Sales Ops / Comp Manager" : /revenue operations|revops|gtm operations|go-to-market operations/.test(t) ? (/head|vp|vice president|director|chief|svp/.test(t) ? "Head of RevOps" : "Sales Ops / Comp Manager") : /sales operations|sales ops/.test(t) ? "Sales Ops / Comp Manager" : /chief revenue|\bcro\b/.test(t) || (/sales/.test(t) && /vp|vice president|head|chief|svp/.test(t)) ? "CRO / VP Sales" : /financ|\bcfo\b/.test(t) ? "CFO / VP Finance" : "Other")(String(t).toLowerCase()) : "")(COL1)
+(t => t ? (t => /commission|compensation|incentive/.test(t) ? "Sales Ops / Comp Manager" : /revenue operations|revops|gtm operations|go-to-market operations/.test(t) ? (/head|vp|vice president|director|chief|svp/.test(t) ? "Head of RevOps" : "Sales Ops / Comp Manager") : /sales operations|sales ops/.test(t) ? "Sales Ops / Comp Manager" : /engineer|enablement|development/.test(t) ? "Other" : /chief revenue|\bcro\b/.test(t) || (/sales/.test(t) && /vp|vice president|head|chief|svp/.test(t)) ? "CRO / VP Sales" : /financ|\bcfo\b/.test(t) ? "CFO / VP Finance" : "Other")(String(t).toLowerCase()) : "")(COL1)
 ```
 
 ## Contact Seniority (clay_contacts_v1)
@@ -42,6 +44,29 @@ Columns: `COL1` → LinkedIn URL, `COL2` → Primary Contact LinkedIn
 ((a, b) => a !== "" && a === b)(String(COL1 || "").toLowerCase().replace(/\/+$/, ""), String(COL2 || "").toLowerCase().replace(/\/+$/, ""))
 ```
 
+## Email Status Raw (clay_contacts_v1)
+
+Columns: `COL1` → Work Email → Validate <provider> → status (one COL per Validate step)
+
+```
+[COL1, COL2, COL3, COL4, COL5, COL6].map(v => String(v || "").trim()).find(v => v !== "") || ""
+```
+
+## Email Verification Status (clay_contacts_v1)
+
+Columns: `COL1` → Work Email, `COL2` → Email Status Raw
+
+```
+((e, s) => e === "" ? "" : s === "true" ? "Valid" : s === "false" ? "Invalid" : /invalid|undeliverable|bounce/.test(s) ? "Invalid" : /unverified|unknown/.test(s) ? "Unknown" : /catch|accept.?all|risky/.test(s) ? "Catch-all" : /valid|deliverable|safe|verified/.test(s) ? "Valid" : "Unknown")(String(COL1 || "").trim(), String(COL2 === false ? "false" : (COL2 || "")).trim().toLowerCase())
+```
+
+## Outreach Channel (clay_contacts_v1)
+
+Columns: `COL1` → Is Primary, `COL2` → Email Verification Status, `COL3` → LinkedIn URL
+
+```
+((p, v, li) => p !== "true" ? "" : v === "Valid" ? "Email" : v === "Catch-all" ? "Email + LinkedIn" : li !== "" ? "LinkedIn Task" : "Manual Research")(String(COL1), String(COL2 || ""), String(COL3 || "").trim())
+```
 ## Send table data (clay_accounts_v1 → clay_contacts_v1)
 
 - Method: Send row for each item in a list → Find contacts at company → people

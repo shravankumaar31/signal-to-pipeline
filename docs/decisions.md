@@ -327,3 +327,11 @@ work around a tool limit, or fix a data-quality problem.
 - Why: Matches Salesforce (Account vs Contact objects), allows a 2nd Tier A contact later, and lets email enrichment run per person, only where Is Primary and Tier is A/B. Reuses the people already found, with no new search.
 - Lesson: Clay's formula checker also rejects `typeof`; use `Array.isArray(v) ? v : []`.
 - Formulas: `clay/contact_formulas_v3.json`, `clay/CLAY_CONTACT_FORMULAS.md` (v1/v2 superseded).
+
+## #41 — Persona ranking fix; re-sending a list duplicates rows
+- Date: 2026-10-14
+- Status: Decided
+- Context: Contacts were found for all 14 Tier A/B accounts (64 people, 6.5 credits). In the review, 12 of the 14 primaries were right. Solink picked "Head of Sales Engineering", because head + sales was read as a sales leader. Notion picked "Head of GTM Operations" over "Global Head of Revenue Operations", because ties went to whoever came first in the list.
+- Decision: Sales Engineering / Enablement / Development titles are persona Other. New last tie-break: a title naming RevOps, commission or compensation wins. Formulas updated in `clay/contact_formulas_v3.json`.
+- Data fixes: one duplicate person (Semperis CFO, two LinkedIn profiles) deleted. One primary had a mis-parsed last name (DoiT); corrected by hand, because the email waterfall searches by name.
+- Lesson: "Update existing rows on re-run" does NOT work in "send row for each item in a list" mode; a re-send appends a full copy of the account's contacts. To refresh an account, delete its old contact rows and keep the newly sent ones. Long-term option: pull account fields with a lookup column on Domain instead of copying them at send time.
