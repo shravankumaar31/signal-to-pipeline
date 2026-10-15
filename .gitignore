@@ -7,3 +7,9 @@ __pycache__/
 data/**/contacts*
 data/**/*people*
 !data/**/.gitkeep
+
+# raw Clay exports contain people data (names, emails) — never commit (decision #43)
+data/clay_exports/
+# n8n local data / credentials
+n8n/.n8n/
+n8n/.cache/

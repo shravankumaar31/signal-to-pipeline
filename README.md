@@ -10,7 +10,7 @@ Sales compensation (ICM) platform; CPQ and quota/territory planning are expansio
 > Flozero is a fictional company created for this portfolio project. Real tools named in this repo
 > (e.g. comp, CPQ and planning vendors) appear only as data — competitor or incumbent signals.
 
-> Status: Phase 3 — enrichment and scoring in Clay (Phases 0–2 complete)
+> Status: Phase 5 next — Claude + MCP rationale, drafts and tasks (Phases 0–4 complete)
 
 ## Architecture
 
@@ -30,12 +30,12 @@ Signal sources ──► Clay table ──► n8n ──► Salesforce
 
 | # | Phase | Status |
 |---|---|---|
-| 0 | Setup: repo, Salesforce org, schema, sales team, Clay | Done (n8n hosting open) |
+| 0 | Setup: repo, Salesforce org, schema, sales team, Clay | Done (n8n self-hosted locally, `scripts/start_n8n.sh`) |
 | 1 | ICP and signal taxonomy with weights | Done (`docs/signal_taxonomy.md`) |
 | 2 | Signal capture (Apify job scrape, funding CSV, leadership seed) | Done — 21-account test set (`data/processed/account_set_preview.csv`) |
-| 3 | Enrichment and scoring in Clay | Not started |
-| 3.5 | Field mapping and write-back rules | Spec done (`docs/salesforce_schema.md`) |
-| 4 | Salesforce upserts and tier routing via n8n | Not started |
+| 3 | Enrichment and scoring in Clay | Done — 2 tables (accounts → contacts), 14 primaries, 13 verified emails, 40 credits (`clay/`) |
+| 3.5 | Field mapping and write-back rules | Done (`docs/salesforce_schema.md`, `n8n/lib/mapping.js`) |
+| 4 | Salesforce upserts via n8n | Done — 19 Accounts, 38 Signals, 14 Contacts, 0 errors (`n8n/workflows/clay_to_salesforce.json`) |
 | 5 | Claude + MCP: rationale, drafts, tasks | Not started |
 | 6 | Reporting, completeness checks, README polish | Not started |
 

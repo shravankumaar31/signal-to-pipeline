@@ -1,0 +1,541 @@
+{
+  "name": "Phase 4 \u2013 Clay CSV \u2192 Salesforce upsert",
+  "nodes": [
+    {
+      "id": "27352252-dcac-5968-8f36-94c4df933b91",
+      "name": "Run pipeline",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "71012419-d105-50aa-8091-b3aef924b41b",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: {\n  sfBase: 'https://orgfarm-ae663148a7-dev-ed.develop.my.salesforce.com/services/data/v62.0',\n  inbox: '/Users/shravankumaar/signal-to-pipeline/data/clay_exports/inbox',\n  processed: '/Users/shravankumaar/signal-to-pipeline/data/clay_exports/processed',\n  runAt: new Date().toISOString(),\n} }];"
+      }
+    },
+    {
+      "id": "5039e51e-7ded-51cc-8ea8-d487e6c404bc",
+      "name": "Read Accounts CSV",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $('Config').first().json.inbox }}/clay_accounts_*.csv",
+        "options": {}
+      }
+    },
+    {
+      "id": "9491a77c-552d-5819-a01f-4056092999e5",
+      "name": "Extract Accounts",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "operation": "csv",
+        "options": {}
+      }
+    },
+    {
+      "id": "e268c5a3-dfac-5b9f-894b-2b1865da112c",
+      "name": "Query existing Accounts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, Domain__c, Name, Website, Enriched_Industry__c, BillingCity, BillingCountry, LinkedIn_Company_URL__c, Tech_Stack__c FROM Account WHERE Domain__c != null"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "f82e31aa-15a3-5aac-ab3d-2c7a2a984da4",
+      "name": "Map Accounts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Clay CSV row -> Salesforce payload mapping (decisions #43, #44; write rules in docs/salesforce_schema.md).\n// Pure functions: the same source is embedded in the n8n Code nodes and tested locally\n// with `node n8n/test_mapping.js`.\n\nconst MAP = {\n  ACCOUNT_FILL_IF_BLANK: ['Name', 'Website', 'Enriched_Industry__c', 'BillingCity', 'BillingCountry', 'LinkedIn_Company_URL__c'],\n  CONTACT_FILL_IF_BLANK: ['FirstName', 'LastName', 'Email', 'LinkedIn_URL__c'],\n  TIERS: ['A', 'B', 'C'],\n  SIGNAL_TYPES: ['Hiring RevOps', 'Sales Team Growth', 'Funding', 'Leadership Change', 'Competitor Mention', 'Other'],\n  FUNDING: ['Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Series E+', 'Public', 'Unknown'],\n  COMP_TOOLS: ['Spreadsheets', 'Xactly', 'CaptivateIQ', 'Varicent', 'Spiff', 'QuotaPath', 'Everstage', 'Performio', 'In-house build', 'Other', 'Unknown'],\n  PERSONAS: ['Head of RevOps', 'Sales Ops / Comp Manager', 'CRO / VP Sales', 'CFO / VP Finance', 'Other'],\n  SENIORITY: ['C-Level', 'VP', 'Director', 'Manager', 'IC'],\n  VERIFICATION: ['Valid', 'Catch-all', 'Invalid', 'Unknown'],\n  COUNTRY: { US: 'United States', CA: 'Canada' },\n};\n\nfunction clean(v) { return v === undefined || v === null ? '' : String(v).trim(); }\nfunction pick(row, names) { for (const n of names) { const v = clean(row[n]); if (v !== '') return v; } return ''; }\nfunction num(v) { const s = clean(v).replace(/[$,\\s]/g, ''); if (!s) return null; const n = Number(s); return Number.isFinite(n) ? n : null; }\nfunction isoDate(v) {\n  const s = clean(v);\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return s;\n  if (!s) return null;\n  const d = new Date(s);\n  return isNaN(d) ? null : d.toISOString().slice(0, 10);\n}\nfunction truthy(v) { return /^(true|yes|1)$/i.test(clean(v)); }\nfunction cap(s, n) { s = clean(s); return s.length <= n ? s : s.slice(0, n - 1) + '\u2026'; }\n\nfunction employeeRange(exact, band) {\n  let n = num(exact);\n  if (n === null) { const m = clean(band).match(/^(\\d[\\d,]*)/); if (m) n = Number(m[1].replace(/,/g, '')); }\n  if (n === null) return null;\n  if (n <= 50) return '1-50';\n  if (n <= 200) return '51-200';\n  if (n <= 500) return '201-500';\n  if (n <= 1000) return '501-1000';\n  return '1001+';\n}\n\nfunction fundingStage(v) {\n  const s = clean(v);\n  if (!s) return null;\n  if (MAP.FUNDING.includes(s)) return s;\n  if (/^series\\s+[e-z]\\b/i.test(s)) return 'Series E+';\n  const m = s.match(/^series\\s+([a-d])\\b/i); if (m) return 'Series ' + m[1].toUpperCase();\n  if (/seed/i.test(s)) return 'Seed';\n  if (/public|ipo|nyse|nasdaq/i.test(s)) return 'Public';\n  return 'Unknown'; // e.g. \"Profitable private\": known state, no matching picklist value\n}\n\nfunction compTool(v) { const s = clean(v); if (!s) return 'Unknown'; return MAP.COMP_TOOLS.includes(s) ? s : 'Other'; }\n\nfunction mergeList(existing, incoming, max) {\n  const out = [], seen = new Set();\n  for (const part of (clean(existing) + ',' + clean(incoming)).split(',')) {\n    const t = part.trim(); if (!t) continue;\n    const k = t.toLowerCase(); if (seen.has(k)) continue;\n    seen.add(k); out.push(t);\n  }\n  let s = out.join(', ');\n  if (s.length > max) s = s.slice(0, s.lastIndexOf(',', max));\n  return s;\n}\n\nfunction dropFilled(body, existing, fields) {\n  if (!existing) return body;\n  for (const f of fields) if (clean(existing[f]) !== '') delete body[f];\n  return body;\n}\n\n// --- Signals: one Signal__c per scoring signal. Events are keyed by date (history kept);\n// states (Sales Team Growth, Competitor Mention) are re-measured each run, keyed \"current\".\nfunction buildSignals(row, domain, runDate) {\n  const primary = clean(row['Primary Signal']);\n  const src = clean(row['Signal Source URL']);\n  const defs = [\n    ['Pts Hiring', 'Hiring RevOps', 'event', () => row['Hiring Posted'],\n      () => 'Hiring: ' + (clean(row['Hiring Role Title']) || 'RevOps / comp role') + (truthy(row['Hiring Comp Specific']) ? ' (comp-specific)' : '') + (truthy(row['Hiring Closed']) ? ' \u2014 posting closed' : '')],\n    ['Pts Funding', 'Funding', 'event', () => row['Funding Signal Date'] || row['Last Funding Date'],\n      () => 'Funding: ' + [clean(row['Funding Stage']), num(row['Last Funding Amount']) ? '$' + Math.round(num(row['Last Funding Amount']) / 1e6) + 'M' : ''].filter(Boolean).join(' ')],\n    ['Pts Sales Growth', 'Sales Team Growth', 'state', () => null, () => 'Sales team growth: ' + (num(row['Open Sales Roles']) || 0) + ' open sales roles'],\n    ['Pts Leadership', 'Leadership Change', 'event', () => row['Leadership Date'], () => 'Leadership change: new ' + (clean(row['Leadership Role']) || 'GTM / finance leader')],\n    ['Pts Competitor', 'Competitor Mention', 'state', () => null, () => 'Competitor mention: ' + (clean(row['Incumbent Comp Tool']) || 'comp tool')],\n    ['Pts Other', 'Other', 'event', () => row['Other Signal Date'], () => 'Other signal'],\n  ];\n  const out = [];\n  for (const [col, type, kind, dateFn, detailFn] of defs) {\n    const pts = num(row[col]);\n    if (!pts || pts <= 0) continue;\n    const d = kind === 'event' ? isoDate(dateFn()) : null;\n    out.push({\n      key: [domain, type, kind === 'state' ? 'current' : (d || 'undated')].join('|'),\n      body: {\n        Signal_Type__c: type,\n        Signal_Date__c: d || runDate,\n        Points__c: pts,\n        Detail__c: cap(detailFn(), 255),\n        Source_URL__c: type === primary && src ? src : null,\n      },\n      eventDate: d,\n    });\n  }\n  return out;\n}\n\nfunction mapAccount(row, existing, runAt) {\n  const runDate = runAt.slice(0, 10);\n  const domain = clean(row['Domain']).toLowerCase().replace(/^https?:\\/\\//, '').replace(/^www\\./, '').replace(/\\/.*$/, '');\n  const tier = clean(row['Signal Tier']);\n  if (!domain) return { skip: 'no domain', name: clean(row['Account Name']) };\n  if (!MAP.TIERS.includes(tier)) return { skip: 'tier ' + (tier || 'blank') + (clean(row['Exclusion']) ? ' (' + clean(row['Exclusion']) + ')' : ''), domain };\n\n  const conflict = clean(row['Headcount Conflict.'] !== undefined ? row['Headcount Conflict.'] : row['Headcount Conflict']);\n  const exact = num(row['Employees (exact)']);\n  const employees = exact !== null ? exact : (conflict ? null : num(row['Employee Count']));\n  const country = clean(row['HQ Country']);\n  const primary = clean(row['Primary Signal']);\n  const signals = buildSignals(row, domain, runDate);\n  const lastSignal = signals.map(s => s.eventDate).filter(Boolean).sort().pop() || null;\n  const crm = clean(row['CRM Final']) || clean(row['CRM']);\n  const ranBuiltWith = clean(row['Find technology stack']) !== '' || clean(row['Technologiesfound']) !== '';\n  const ranContacts = clean(row['Find contacts at company']) !== '';\n\n  const body = {\n    Name: clean(row['Account Name']) || clean(row['Name']) || domain,\n    Website: 'https://' + domain,\n    Enriched_Industry__c: clean(row['Industry']) || null,\n    NumberOfEmployees: employees,\n    Employee_Range__c: employeeRange(row['Employees (exact)'], row['Employee Band']),\n    BillingCity: clean(row['HQ City']) || null,\n    BillingCountry: MAP.COUNTRY[country] || clean(row['HQ Country Name']) || country || null,\n    LinkedIn_Company_URL__c: clean(row['Url']) || null,\n    Funding_Stage__c: fundingStage(row['Funding Stage']),\n    Last_Funding_Amount__c: num(row['Last Funding Amount']),\n    Last_Funding_Date__c: isoDate(row['Last Funding Date']),\n    Tech_Stack__c: mergeList(existing && existing.Tech_Stack__c, row['Technologiesfound'], 5000) || null,\n    Incumbent_Comp_Tool__c: compTool(row['Incumbent Comp Tool']),\n    Open_RevOps_Roles_Count__c: (num(row['Pts Hiring']) || 0) > 0 && !truthy(row['Hiring Closed']) ? 1 : 0,\n    Open_Sales_Roles_Count__c: num(row['Open Sales Roles']) || 0,\n    Signal_Score__c: num(row['Score']),\n    Signal_Tier__c: tier,\n    Primary_Signal__c: MAP.SIGNAL_TYPES.includes(primary) ? primary : null,\n    Signal_Source_URL__c: clean(row['Signal Source URL']) || null,\n    Last_Signal_Date__c: lastSignal,\n    Enrichment_Date__c: runAt,\n    Enrichment_Credits_Used__c: 0.5 + (ranBuiltWith ? 1 : 0) + (ranContacts ? 0.5 : 0),\n  };\n\n  const required = { Enriched_Industry__c: body.Enriched_Industry__c, NumberOfEmployees: body.NumberOfEmployees, BillingCountry: body.BillingCountry, Funding_Stage__c: body.Funding_Stage__c, Signal_Score__c: body.Signal_Score__c, Primary_Signal__c: body.Primary_Signal__c };\n  const missing = Object.keys(required).filter(k => required[k] === null || required[k] === '');\n  const flags = [];\n  if (conflict) flags.push('Verify headcount');\n  if (!crm || crm === 'Unknown') flags.push('Verify CRM');\n  body.Enrichment_Status__c = missing.length ? 'Partial' : 'Complete';\n  body.Missing_Fields__c = cap(missing.concat(flags).join('; '), 255) || null;\n\n  dropFilled(body, existing, MAP.ACCOUNT_FILL_IF_BLANK);\n  return { domain, tier, body, signals: signals.map(({ key, body }) => ({ key, body })) };\n}\n\nfunction linkedinSlug(url) {\n  const m = clean(url).match(/linkedin\\.com\\/in\\/([^/?#]+)/i);\n  if (!m) return '';\n  try { return decodeURIComponent(m[1]).toLowerCase(); } catch (e) { return m[1].toLowerCase(); }\n}\n\nfunction mapContact(row, existing, runAt) {\n  if (!truthy(row['Is Primary'])) return { skip: 'not primary' };\n  const domain = clean(row['Domain']).toLowerCase();\n  const email = pick(row, ['Work Email', 'Email']).toLowerCase();\n  const li = pick(row, ['Linkedin URL', 'LinkedIn URL']);\n  const key = email || (linkedinSlug(li) ? 'li:' + linkedinSlug(li) : '');\n  if (!key) return { skip: 'no email or LinkedIn', domain };\n  if (!domain) return { skip: 'no domain', key };\n\n  const persona = clean(row['Contact Persona']);\n  const seniority = clean(row['Contact Seniority']);\n  const verification = clean(row['Email Verification Status']);\n  const body = {\n    FirstName: clean(row['First Name']) || null,\n    LastName: clean(row['Last Name']) || '(unknown)',\n    Title: clean(row['Title']) || null,\n    Email: email || null,\n    Email_Verification_Status__c: email ? (MAP.VERIFICATION.includes(verification) ? verification : 'Unknown') : null,\n    Persona__c: MAP.PERSONAS.includes(persona) ? persona : 'Other',\n    Seniority__c: MAP.SENIORITY.includes(seniority) ? seniority : null,\n    LinkedIn_URL__c: li || null,\n    Account: { Domain__c: domain },\n    Enrichment_Date__c: runAt,\n  };\n  if (!existing) body.Outreach_Status__c = 'Not Started';\n\n  const missing = [];\n  if (!email || !['Valid', 'Catch-all'].includes(body.Email_Verification_Status__c)) missing.push('Email');\n  for (const f of ['FirstName', 'Title', 'Seniority__c']) if (!body[f]) missing.push(f);\n  if (body.LastName === '(unknown)') missing.push('LastName');\n  body.Enrichment_Status__c = missing.length ? 'Partial' : 'Complete';\n  body.Missing_Fields__c = missing.join('; ') || null;\n\n  if (!email) delete body.Email;\n  if (!body.Email_Verification_Status__c) delete body.Email_Verification_Status__c;\n  dropFilled(body, existing, MAP.CONTACT_FILL_IF_BLANK);\n  return { key, domain, channel: clean(row['Outreach Channel']) || (email ? 'Email' : 'LinkedIn Task'), body };\n}\n\n\nconst runAt = $('Config').first().json.runAt;\nconst existing = Object.fromEntries(($input.first().json.records || []).map(r => [String(r.Domain__c).toLowerCase(), r]));\nconst byDomain = {};\nfor (const item of $('Extract Accounts').all()) {\n  const d = String(item.json['Domain'] || '').trim().toLowerCase();\n  byDomain[d || ('row' + Object.keys(byDomain).length)] = item.json;   // later export wins\n}\nconst out = [];\nfor (const row of Object.values(byDomain)) {\n  const m = mapAccount(row, existing[String(row['Domain'] || '').trim().toLowerCase()], runAt);\n  out.push({ json: m });\n}\nreturn out.filter(o => !o.json.skip);   // Excluded / no-domain rows are not written\n"
+      }
+    },
+    {
+      "id": "e1960925-e4bf-5b60-9a57-9719d6095e0c",
+      "name": "Upsert Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.sfBase }}/sobjects/Account/Domain__c/{{ encodeURIComponent($json.domain) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      }
+    },
+    {
+      "id": "2c7c58da-e408-5520-924b-09ed2ad5228f",
+      "name": "Query existing Signals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Signal_Key__c FROM Signal__c WHERE Signal_Key__c != null"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9a265779-e35b-54cd-9c9b-fe36ff3f6df8",
+      "name": "Build Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst have = new Set(($input.first().json.records || []).map(r => r.Signal_Key__c));\nconst out = [];\nfor (const a of $('Map Accounts').all()) {\n  for (const s of (a.json.signals || [])) {\n    const body = Object.assign({}, s.body);\n    if (!have.has(s.key)) body.Account__r = { Domain__c: a.json.domain };   // master-detail set on create only\n    out.push({ json: { key: s.key, body } });\n  }\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "c57ad2a1-90a1-5383-9419-0a23d367ba06",
+      "name": "Upsert Signal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.sfBase }}/sobjects/Signal__c/Signal_Key__c/{{ encodeURIComponent($json.key) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      }
+    },
+    {
+      "id": "14b3c9a3-017c-5efd-9d69-cf1fe9ed559d",
+      "name": "Read Contacts CSV",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $('Config').first().json.inbox }}/clay_contacts_*.csv",
+        "options": {}
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "8d2d546f-1107-5a19-8119-188d26a491fb",
+      "name": "Extract Contacts",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        300
+      ],
+      "parameters": {
+        "operation": "csv",
+        "options": {}
+      }
+    },
+    {
+      "id": "b99b4382-a89e-5f0c-9df6-90557621dbab",
+      "name": "Query existing Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, Email_Key__c, FirstName, LastName, Email, LinkedIn_URL__c, Outreach_Status__c FROM Contact WHERE Email_Key__c != null"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "e5f6623e-84ca-5e68-aff4-13be35520296",
+      "name": "Map Contacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Clay CSV row -> Salesforce payload mapping (decisions #43, #44; write rules in docs/salesforce_schema.md).\n// Pure functions: the same source is embedded in the n8n Code nodes and tested locally\n// with `node n8n/test_mapping.js`.\n\nconst MAP = {\n  ACCOUNT_FILL_IF_BLANK: ['Name', 'Website', 'Enriched_Industry__c', 'BillingCity', 'BillingCountry', 'LinkedIn_Company_URL__c'],\n  CONTACT_FILL_IF_BLANK: ['FirstName', 'LastName', 'Email', 'LinkedIn_URL__c'],\n  TIERS: ['A', 'B', 'C'],\n  SIGNAL_TYPES: ['Hiring RevOps', 'Sales Team Growth', 'Funding', 'Leadership Change', 'Competitor Mention', 'Other'],\n  FUNDING: ['Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Series E+', 'Public', 'Unknown'],\n  COMP_TOOLS: ['Spreadsheets', 'Xactly', 'CaptivateIQ', 'Varicent', 'Spiff', 'QuotaPath', 'Everstage', 'Performio', 'In-house build', 'Other', 'Unknown'],\n  PERSONAS: ['Head of RevOps', 'Sales Ops / Comp Manager', 'CRO / VP Sales', 'CFO / VP Finance', 'Other'],\n  SENIORITY: ['C-Level', 'VP', 'Director', 'Manager', 'IC'],\n  VERIFICATION: ['Valid', 'Catch-all', 'Invalid', 'Unknown'],\n  COUNTRY: { US: 'United States', CA: 'Canada' },\n};\n\nfunction clean(v) { return v === undefined || v === null ? '' : String(v).trim(); }\nfunction pick(row, names) { for (const n of names) { const v = clean(row[n]); if (v !== '') return v; } return ''; }\nfunction num(v) { const s = clean(v).replace(/[$,\\s]/g, ''); if (!s) return null; const n = Number(s); return Number.isFinite(n) ? n : null; }\nfunction isoDate(v) {\n  const s = clean(v);\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return s;\n  if (!s) return null;\n  const d = new Date(s);\n  return isNaN(d) ? null : d.toISOString().slice(0, 10);\n}\nfunction truthy(v) { return /^(true|yes|1)$/i.test(clean(v)); }\nfunction cap(s, n) { s = clean(s); return s.length <= n ? s : s.slice(0, n - 1) + '\u2026'; }\n\nfunction employeeRange(exact, band) {\n  let n = num(exact);\n  if (n === null) { const m = clean(band).match(/^(\\d[\\d,]*)/); if (m) n = Number(m[1].replace(/,/g, '')); }\n  if (n === null) return null;\n  if (n <= 50) return '1-50';\n  if (n <= 200) return '51-200';\n  if (n <= 500) return '201-500';\n  if (n <= 1000) return '501-1000';\n  return '1001+';\n}\n\nfunction fundingStage(v) {\n  const s = clean(v);\n  if (!s) return null;\n  if (MAP.FUNDING.includes(s)) return s;\n  if (/^series\\s+[e-z]\\b/i.test(s)) return 'Series E+';\n  const m = s.match(/^series\\s+([a-d])\\b/i); if (m) return 'Series ' + m[1].toUpperCase();\n  if (/seed/i.test(s)) return 'Seed';\n  if (/public|ipo|nyse|nasdaq/i.test(s)) return 'Public';\n  return 'Unknown'; // e.g. \"Profitable private\": known state, no matching picklist value\n}\n\nfunction compTool(v) { const s = clean(v); if (!s) return 'Unknown'; return MAP.COMP_TOOLS.includes(s) ? s : 'Other'; }\n\nfunction mergeList(existing, incoming, max) {\n  const out = [], seen = new Set();\n  for (const part of (clean(existing) + ',' + clean(incoming)).split(',')) {\n    const t = part.trim(); if (!t) continue;\n    const k = t.toLowerCase(); if (seen.has(k)) continue;\n    seen.add(k); out.push(t);\n  }\n  let s = out.join(', ');\n  if (s.length > max) s = s.slice(0, s.lastIndexOf(',', max));\n  return s;\n}\n\nfunction dropFilled(body, existing, fields) {\n  if (!existing) return body;\n  for (const f of fields) if (clean(existing[f]) !== '') delete body[f];\n  return body;\n}\n\n// --- Signals: one Signal__c per scoring signal. Events are keyed by date (history kept);\n// states (Sales Team Growth, Competitor Mention) are re-measured each run, keyed \"current\".\nfunction buildSignals(row, domain, runDate) {\n  const primary = clean(row['Primary Signal']);\n  const src = clean(row['Signal Source URL']);\n  const defs = [\n    ['Pts Hiring', 'Hiring RevOps', 'event', () => row['Hiring Posted'],\n      () => 'Hiring: ' + (clean(row['Hiring Role Title']) || 'RevOps / comp role') + (truthy(row['Hiring Comp Specific']) ? ' (comp-specific)' : '') + (truthy(row['Hiring Closed']) ? ' \u2014 posting closed' : '')],\n    ['Pts Funding', 'Funding', 'event', () => row['Funding Signal Date'] || row['Last Funding Date'],\n      () => 'Funding: ' + [clean(row['Funding Stage']), num(row['Last Funding Amount']) ? '$' + Math.round(num(row['Last Funding Amount']) / 1e6) + 'M' : ''].filter(Boolean).join(' ')],\n    ['Pts Sales Growth', 'Sales Team Growth', 'state', () => null, () => 'Sales team growth: ' + (num(row['Open Sales Roles']) || 0) + ' open sales roles'],\n    ['Pts Leadership', 'Leadership Change', 'event', () => row['Leadership Date'], () => 'Leadership change: new ' + (clean(row['Leadership Role']) || 'GTM / finance leader')],\n    ['Pts Competitor', 'Competitor Mention', 'state', () => null, () => 'Competitor mention: ' + (clean(row['Incumbent Comp Tool']) || 'comp tool')],\n    ['Pts Other', 'Other', 'event', () => row['Other Signal Date'], () => 'Other signal'],\n  ];\n  const out = [];\n  for (const [col, type, kind, dateFn, detailFn] of defs) {\n    const pts = num(row[col]);\n    if (!pts || pts <= 0) continue;\n    const d = kind === 'event' ? isoDate(dateFn()) : null;\n    out.push({\n      key: [domain, type, kind === 'state' ? 'current' : (d || 'undated')].join('|'),\n      body: {\n        Signal_Type__c: type,\n        Signal_Date__c: d || runDate,\n        Points__c: pts,\n        Detail__c: cap(detailFn(), 255),\n        Source_URL__c: type === primary && src ? src : null,\n      },\n      eventDate: d,\n    });\n  }\n  return out;\n}\n\nfunction mapAccount(row, existing, runAt) {\n  const runDate = runAt.slice(0, 10);\n  const domain = clean(row['Domain']).toLowerCase().replace(/^https?:\\/\\//, '').replace(/^www\\./, '').replace(/\\/.*$/, '');\n  const tier = clean(row['Signal Tier']);\n  if (!domain) return { skip: 'no domain', name: clean(row['Account Name']) };\n  if (!MAP.TIERS.includes(tier)) return { skip: 'tier ' + (tier || 'blank') + (clean(row['Exclusion']) ? ' (' + clean(row['Exclusion']) + ')' : ''), domain };\n\n  const conflict = clean(row['Headcount Conflict.'] !== undefined ? row['Headcount Conflict.'] : row['Headcount Conflict']);\n  const exact = num(row['Employees (exact)']);\n  const employees = exact !== null ? exact : (conflict ? null : num(row['Employee Count']));\n  const country = clean(row['HQ Country']);\n  const primary = clean(row['Primary Signal']);\n  const signals = buildSignals(row, domain, runDate);\n  const lastSignal = signals.map(s => s.eventDate).filter(Boolean).sort().pop() || null;\n  const crm = clean(row['CRM Final']) || clean(row['CRM']);\n  const ranBuiltWith = clean(row['Find technology stack']) !== '' || clean(row['Technologiesfound']) !== '';\n  const ranContacts = clean(row['Find contacts at company']) !== '';\n\n  const body = {\n    Name: clean(row['Account Name']) || clean(row['Name']) || domain,\n    Website: 'https://' + domain,\n    Enriched_Industry__c: clean(row['Industry']) || null,\n    NumberOfEmployees: employees,\n    Employee_Range__c: employeeRange(row['Employees (exact)'], row['Employee Band']),\n    BillingCity: clean(row['HQ City']) || null,\n    BillingCountry: MAP.COUNTRY[country] || clean(row['HQ Country Name']) || country || null,\n    LinkedIn_Company_URL__c: clean(row['Url']) || null,\n    Funding_Stage__c: fundingStage(row['Funding Stage']),\n    Last_Funding_Amount__c: num(row['Last Funding Amount']),\n    Last_Funding_Date__c: isoDate(row['Last Funding Date']),\n    Tech_Stack__c: mergeList(existing && existing.Tech_Stack__c, row['Technologiesfound'], 5000) || null,\n    Incumbent_Comp_Tool__c: compTool(row['Incumbent Comp Tool']),\n    Open_RevOps_Roles_Count__c: (num(row['Pts Hiring']) || 0) > 0 && !truthy(row['Hiring Closed']) ? 1 : 0,\n    Open_Sales_Roles_Count__c: num(row['Open Sales Roles']) || 0,\n    Signal_Score__c: num(row['Score']),\n    Signal_Tier__c: tier,\n    Primary_Signal__c: MAP.SIGNAL_TYPES.includes(primary) ? primary : null,\n    Signal_Source_URL__c: clean(row['Signal Source URL']) || null,\n    Last_Signal_Date__c: lastSignal,\n    Enrichment_Date__c: runAt,\n    Enrichment_Credits_Used__c: 0.5 + (ranBuiltWith ? 1 : 0) + (ranContacts ? 0.5 : 0),\n  };\n\n  const required = { Enriched_Industry__c: body.Enriched_Industry__c, NumberOfEmployees: body.NumberOfEmployees, BillingCountry: body.BillingCountry, Funding_Stage__c: body.Funding_Stage__c, Signal_Score__c: body.Signal_Score__c, Primary_Signal__c: body.Primary_Signal__c };\n  const missing = Object.keys(required).filter(k => required[k] === null || required[k] === '');\n  const flags = [];\n  if (conflict) flags.push('Verify headcount');\n  if (!crm || crm === 'Unknown') flags.push('Verify CRM');\n  body.Enrichment_Status__c = missing.length ? 'Partial' : 'Complete';\n  body.Missing_Fields__c = cap(missing.concat(flags).join('; '), 255) || null;\n\n  dropFilled(body, existing, MAP.ACCOUNT_FILL_IF_BLANK);\n  return { domain, tier, body, signals: signals.map(({ key, body }) => ({ key, body })) };\n}\n\nfunction linkedinSlug(url) {\n  const m = clean(url).match(/linkedin\\.com\\/in\\/([^/?#]+)/i);\n  if (!m) return '';\n  try { return decodeURIComponent(m[1]).toLowerCase(); } catch (e) { return m[1].toLowerCase(); }\n}\n\nfunction mapContact(row, existing, runAt) {\n  if (!truthy(row['Is Primary'])) return { skip: 'not primary' };\n  const domain = clean(row['Domain']).toLowerCase();\n  const email = pick(row, ['Work Email', 'Email']).toLowerCase();\n  const li = pick(row, ['Linkedin URL', 'LinkedIn URL']);\n  const key = email || (linkedinSlug(li) ? 'li:' + linkedinSlug(li) : '');\n  if (!key) return { skip: 'no email or LinkedIn', domain };\n  if (!domain) return { skip: 'no domain', key };\n\n  const persona = clean(row['Contact Persona']);\n  const seniority = clean(row['Contact Seniority']);\n  const verification = clean(row['Email Verification Status']);\n  const body = {\n    FirstName: clean(row['First Name']) || null,\n    LastName: clean(row['Last Name']) || '(unknown)',\n    Title: clean(row['Title']) || null,\n    Email: email || null,\n    Email_Verification_Status__c: email ? (MAP.VERIFICATION.includes(verification) ? verification : 'Unknown') : null,\n    Persona__c: MAP.PERSONAS.includes(persona) ? persona : 'Other',\n    Seniority__c: MAP.SENIORITY.includes(seniority) ? seniority : null,\n    LinkedIn_URL__c: li || null,\n    Account: { Domain__c: domain },\n    Enrichment_Date__c: runAt,\n  };\n  if (!existing) body.Outreach_Status__c = 'Not Started';\n\n  const missing = [];\n  if (!email || !['Valid', 'Catch-all'].includes(body.Email_Verification_Status__c)) missing.push('Email');\n  for (const f of ['FirstName', 'Title', 'Seniority__c']) if (!body[f]) missing.push(f);\n  if (body.LastName === '(unknown)') missing.push('LastName');\n  body.Enrichment_Status__c = missing.length ? 'Partial' : 'Complete';\n  body.Missing_Fields__c = missing.join('; ') || null;\n\n  if (!email) delete body.Email;\n  if (!body.Email_Verification_Status__c) delete body.Email_Verification_Status__c;\n  dropFilled(body, existing, MAP.CONTACT_FILL_IF_BLANK);\n  return { key, domain, channel: clean(row['Outreach Channel']) || (email ? 'Email' : 'LinkedIn Task'), body };\n}\n\n\nconst runAt = $('Config').first().json.runAt;\nconst existing = Object.fromEntries(($input.first().json.records || []).map(r => [String(r.Email_Key__c).toLowerCase(), r]));\nconst out = [];\nfor (const item of $('Extract Contacts').all()) {\n  const pre = mapContact(item.json, null, runAt);\n  if (pre.skip) continue;\n  const m = mapContact(item.json, existing[pre.key], runAt);\n  out.push({ json: m });\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "e0f4600c-037f-5692-9f0d-00ed3cf0270e",
+      "name": "Upsert Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.sfBase }}/sobjects/Contact/Email_Key__c/{{ encodeURIComponent($json.key) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      }
+    },
+    {
+      "id": "0c573178-8f7c-560c-8427-66cf2aa2ccf9",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3300,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nfunction tally(upsertNode, mapNode, label) {\n  const sent = $(mapNode).all(), res = $(upsertNode).all();\n  const r = { created: 0, updated: 0, skipped: 0, errors: [] };\n  res.forEach((it, i) => {\n    const src = sent[i] ? sent[i].json : {};\n    if (src.skip) { r.skipped++; return; }\n    const code = it.json.statusCode;\n    if (code === 201) r.created++;\n    else if (code === 200 || code === 204) r.updated++;\n    else r.errors.push({ [label]: src.domain || src.key, status: code, error: JSON.stringify(it.json.body || it.json).slice(0, 300) });\n  });\n  return r;\n}\nconst accounts = tally('Upsert Account', 'Map Accounts', 'account');\nconst signals = tally('Upsert Signal', 'Build Signals', 'signal');\nconst contacts = tally('Upsert Contact', 'Map Contacts', 'contact');\nconst errors = accounts.errors.length + signals.errors.length + contacts.errors.length;\nconst channels = {};\nfor (const c of $('Map Contacts').all()) if (c.json.channel) channels[c.json.channel] = (channels[c.json.channel] || 0) + 1;\nreturn [{ json: { runAt: $('Config').first().json.runAt, errors, accounts, signals, contacts, outreachChannels: channels } }];\n"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "f4881a1e-e765-5128-b24b-cc0c468bc846",
+      "name": "Archive files",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        300
+      ],
+      "parameters": {
+        "command": "={{ $json.errors === 0 ? `mkdir -p \"${$('Config').first().json.processed}/${$json.runAt.replace(/[:.]/g, '-')}\" && mv \"${$('Config').first().json.inbox}\"/clay_*.csv \"${$('Config').first().json.processed}/${$json.runAt.replace(/[:.]/g, '-')}/\" && echo archived` : 'echo \"errors found: files left in inbox\"' }}"
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Run pipeline": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Accounts CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Accounts CSV": {
+      "main": [
+        [
+          {
+            "node": "Extract Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Accounts": {
+      "main": [
+        [
+          {
+            "node": "Query existing Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query existing Accounts": {
+      "main": [
+        [
+          {
+            "node": "Map Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Accounts": {
+      "main": [
+        [
+          {
+            "node": "Upsert Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Account": {
+      "main": [
+        [
+          {
+            "node": "Query existing Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query existing Signals": {
+      "main": [
+        [
+          {
+            "node": "Build Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Signals": {
+      "main": [
+        [
+          {
+            "node": "Upsert Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Signal": {
+      "main": [
+        [
+          {
+            "node": "Read Contacts CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Contacts CSV": {
+      "main": [
+        [
+          {
+            "node": "Extract Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Contacts": {
+      "main": [
+        [
+          {
+            "node": "Query existing Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query existing Contacts": {
+      "main": [
+        [
+          {
+            "node": "Map Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Contacts": {
+      "main": [
+        [
+          {
+            "node": "Upsert Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Contact": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary": {
+      "main": [
+        [
+          {
+            "node": "Archive files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}
