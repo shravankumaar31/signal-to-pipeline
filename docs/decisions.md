@@ -385,3 +385,12 @@ work around a tool limit, or fix a data-quality problem.
 - Problems fixed: (1) the test CSV parser dropped the last row (no trailing newline), which looked like one unassigned account per role. (2) `sf data update record --where` takes space-separated field=value pairs, not SOQL (`AND` failed). (3) Importing a workflow JSON into an existing canvas duplicates nodes with a "1" suffix and breaks `$('Node')` references → always import into a new empty workflow. (4) Deployed fields are not added to page layouts → added a Routing section to Account Layout (layout changes take a minute to show).
 - Why: territory keeps rep–account fit and familiarity; capacity caps stop the top rep from drowning; ramp rules protect Tier A conversion; reasons on every record make routing auditable for reps and managers.
 - Trade-off: rules live in code, not in Salesforce assignment rules, so admins change them in `routing.js` (tested) rather than in Setup. Attainment is a manual input until it is calculated from Opportunities.
+
+## #48 — Incumbent comp tool: researched overrides on top of Clay
+- Date: 2026-10-15
+- Status: Done
+- Context: Clay only set Incumbent Comp Tool when a signal (job posting / competitor mention) named a tool, so 11 of 19 accounts were Unknown and Gong was "Other".
+- Decision / Solution: researched the 12 gaps on the web (vendor customer pages and case studies for CaptivateIQ, Spiff, Xactly, QuotaPath, Everstage; casestudies.com vendor lists; open comp-team postings). Results live in `data/research/incumbent_comp_tool.csv` (domain, tool, status, source URL, date, note). `n8n/build_workflow.py` embeds the Confirmed rows into Map Accounts, where they override Clay's value.
+- Result: Gong → CaptivateIQ (vendor case study; set by hand in Salesforce on 2026-10-15, the override keeps future Phase 4 runs from reverting it); Notion's Everstage re-confirmed. The other 10 stay Unknown, marked "Checked - not found" with the date. Sierra and Keeper have open comp roles that name no platform (Keeper asks for Excel/Sheets skills, which is not evidence of a spreadsheet process).
+- Rule: only a public, linkable source counts; no guessing from company size or stack. Scores are unchanged (the competitor-mention points come from live signals, not this field).
+- Trade-off: manual research doesn't scale; at volume this becomes a Claygent column or a scheduled Claude research step writing the same CSV.

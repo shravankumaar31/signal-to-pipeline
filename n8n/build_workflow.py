@@ -10,6 +10,10 @@ import json, pathlib, uuid
 
 ROOT = pathlib.Path(__file__).resolve().parent
 LIB = (ROOT / "lib" / "mapping.js").read_text().split("if (typeof module")[0]
+# Researched incumbent comp tools (vendor case studies / customer pages / postings) override Clay's value (decision #48)
+import csv
+with open(ROOT.parent / "data" / "research" / "incumbent_comp_tool.csv") as f:
+    COMP_OVERRIDES = {r["domain"]: r["incumbent_comp_tool"] for r in csv.DictReader(f) if r["status"] == "Confirmed" and r["incumbent_comp_tool"]}
 
 SF_BASE = "https://orgfarm-ae663148a7-dev-ed.develop.my.salesforce.com/services/data/v62.0"
 REPO = "/Users/shravankumaar/signal-to-pipeline"
@@ -60,7 +64,7 @@ c = code("Config", f"""return [{{ json: {{
 ea = read_csv("Accounts", "clay_accounts_*.csv", next(X), c); next(X)
 qa = http("Query existing Accounts", "GET", "={{ $('Config').first().json.sfBase }}/query", next(X), ea, once=True, full=False,
           query={"q": "SELECT Id, Domain__c, Name, Website, Enriched_Industry__c, BillingCity, BillingCountry, LinkedIn_Company_URL__c, Tech_Stack__c FROM Account WHERE Domain__c != null"})
-ma = code("Map Accounts", LIB + """
+ma = code("Map Accounts", LIB + "\nconst COMP_OVERRIDES = " + json.dumps(COMP_OVERRIDES) + ";\n" + """
 const runAt = $('Config').first().json.runAt;
 const existing = Object.fromEntries(($input.first().json.records || []).map(r => [String(r.Domain__c).toLowerCase(), r]));
 const byDomain = {};
@@ -71,6 +75,7 @@ for (const item of $('Extract Accounts').all()) {
 const out = [];
 for (const row of Object.values(byDomain)) {
   const m = mapAccount(row, existing[String(row['Domain'] || '').trim().toLowerCase()], runAt);
+  if (!m.skip && COMP_OVERRIDES[m.domain]) m.body.Incumbent_Comp_Tool__c = COMP_OVERRIDES[m.domain];
   out.push({ json: m });
 }
 return out.filter(o => !o.json.skip);   // Excluded / no-domain rows are not written
