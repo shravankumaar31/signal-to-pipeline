@@ -10,7 +10,7 @@ Sales compensation (ICM) platform; CPQ and quota/territory planning are expansio
 > Flozero is a fictional company created for this portfolio project. Real tools named in this repo
 > (e.g. comp, CPQ and planning vendors) appear only as data — competitor or incumbent signals.
 
-> Status: Phase 5 next — Claude + MCP rationale, drafts and tasks (Phases 0–4 complete)
+> Status: Phase 6 next — reporting and completeness checks (Phases 0–5 complete)
 
 ## Architecture
 
@@ -36,7 +36,7 @@ Signal sources ──► Clay table ──► n8n ──► Salesforce
 | 3 | Enrichment and scoring in Clay | Done — 2 tables (accounts → contacts), 14 primaries, 13 verified emails, 40 credits (`clay/`) |
 | 3.5 | Field mapping and write-back rules | Done (`docs/salesforce_schema.md`, `n8n/lib/mapping.js`) |
 | 4 | Salesforce upserts via n8n | Done — 19 Accounts, 38 Signals, 14 Contacts, 0 errors (`n8n/workflows/clay_to_salesforce.json`) |
-| 5 | Claude + MCP: rationale, drafts, tasks | Not started |
+| 5 | Claude + MCP: rationale, drafts, tasks | Done — 14 rationales, 13 test-inbox Gmail drafts, 14 Tasks (`prompts/why_now_and_email.md`, `n8n/workflows/outreach_to_salesforce.json`) |
 | 6 | Reporting, completeness checks, README polish | Not started |
 
 ## Backlog (after the base build ships)

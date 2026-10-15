@@ -18,6 +18,16 @@
                 <default>false</default>
                 <label>Manual Research Needed</label>
             </value>
+            <value>
+                <fullName>Tier B Outreach</fullName>
+                <default>false</default>
+                <label>Tier B Outreach</label>
+            </value>
+            <value>
+                <fullName>LinkedIn Outreach</fullName>
+                <default>false</default>
+                <label>LinkedIn Outreach</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

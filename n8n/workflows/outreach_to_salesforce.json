@@ -1,0 +1,355 @@
+{
+  "name": "Phase 5 \u2013 Claude outreach \u2192 Salesforce (rationale + tasks)",
+  "nodes": [
+    {
+      "id": "7860cac5-2d5c-5299-99b9-8e65184e8de5",
+      "name": "Run outreach sync",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "ae2e7628-b86d-5993-a317-3030a22c1156",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: {\n  sfBase: 'https://orgfarm-ae663148a7-dev-ed.develop.my.salesforce.com/services/data/v62.0',\n  inbox: '/Users/shravankumaar/signal-to-pipeline/data/clay_exports/inbox',\n  processed: '/Users/shravankumaar/signal-to-pipeline/data/clay_exports/processed',\n  runAt: new Date().toISOString(),\n} }];"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "19e4dcd2-9870-5256-b924-b1f596f9f4f4",
+      "name": "Read outreach JSON",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $('Config').first().json.inbox }}/claude_outreach_*.json",
+        "options": {}
+      }
+    },
+    {
+      "id": "8eb64e67-df9a-547b-9ae9-d1f4ca7d4eac",
+      "name": "Extract outreach",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      }
+    },
+    {
+      "id": "f786536b-2288-5eb1-a643-dd0a228bc570",
+      "name": "Query Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, AccountId, Email_Key__c, Outreach_Status__c FROM Contact WHERE Email_Key__c != null"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "78a17fd6-ef3b-5b0a-ae52-0aab32d1d628",
+      "name": "Query open automated Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, WhoId FROM Task WHERE Created_By_Automation__c = true AND IsClosed = false"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "077af487-fb9d-5bf5-b09b-ea40387cab65",
+      "name": "Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst contacts = Object.fromEntries(($('Query Contacts').first().json.records || []).map(r => [String(r.Email_Key__c).toLowerCase(), r]));\nconst openTaskFor = new Set(($input.first().json.records || []).map(r => r.WhoId));\nconst records = $('Extract outreach').all().flatMap(i => (i.json.data && i.json.data.records) || []);\nconst updates = [], tasks = [], notFound = [], skippedTasks = [];\nfor (const rec of records) {\n  const c = contacts[String(rec.key).toLowerCase()];\n  if (!c) { notFound.push(rec.domain); continue; }\n  const u = { attributes: { type: 'Contact' }, Id: c.Id, Why_Now_Rationale__c: String(rec.why_now).slice(0, 2000) };\n  // Outreach status is workflow-owned: only move Not Started -> Drafted when an email draft exists\n  if (rec.channel === 'Email' && rec.gmail_draft_id && (!c.Outreach_Status__c || c.Outreach_Status__c === 'Not Started')) u.Outreach_Status__c = 'Drafted';\n  updates.push(u);\n  if (openTaskFor.has(c.Id)) { skippedTasks.push(rec.domain); continue; }\n  tasks.push(Object.assign({ attributes: { type: 'Task' }, WhoId: c.Id, WhatId: c.AccountId }, rec.task));\n}\nreturn [{ json: { updates, tasks, notFound, skippedTasks } }];\n"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "90368d90-cea9-5ab7-8b83-38c168840a5d",
+      "name": "Update Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.sfBase }}/composite/sobjects",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ allOrNone: false, records: $('Plan').first().json.updates }) }}"
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "efca917c-ebc8-5c28-8822-53003f039db7",
+      "name": "Create Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.sfBase }}/composite/sobjects",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ allOrNone: false, records: $('Plan').first().json.tasks }) }}"
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "0785d434-ff46-5227-891c-ea2d12c2eb42",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst plan = $('Plan').first().json;\nfunction res(node, sent) {\n  if (!sent.length) return { ok: 0, errors: [] };\n  const j = $(node).first().json, body = Array.isArray(j.body) ? j.body : [];\n  if (!body.length) return { ok: 0, errors: [{ status: j.statusCode, error: JSON.stringify(j.body).slice(0, 400) }] };\n  return { ok: body.filter(b => b.success).length, errors: body.filter(b => !b.success).map(b => JSON.stringify(b.errors).slice(0, 300)) };\n}\nconst contacts = res('Update Contacts', plan.updates), tasks = res('Create Tasks', plan.tasks);\nconst errors = contacts.errors.length + tasks.errors.length + plan.notFound.length;\nreturn [{ json: { runAt: $('Config').first().json.runAt, errors, contactsUpdated: contacts.ok, tasksCreated: tasks.ok,\n  tasksSkippedExisting: plan.skippedTasks, contactsNotFound: plan.notFound, contactErrors: contacts.errors, taskErrors: tasks.errors } }];\n"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "eaf82afa-9d86-5c4e-b57e-0c7bd61254eb",
+      "name": "Archive file",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "command": "={{ $json.errors === 0 ? `mkdir -p \"${$('Config').first().json.processed}/${$json.runAt.replace(/[:.]/g, '-')}\" && mv \"${$('Config').first().json.inbox}\"/claude_outreach_*.json \"${$('Config').first().json.processed}/${$json.runAt.replace(/[:.]/g, '-')}/\" && echo archived` : 'echo \"errors found: file left in inbox\"' }}"
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Run outreach sync": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read outreach JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read outreach JSON": {
+      "main": [
+        [
+          {
+            "node": "Extract outreach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract outreach": {
+      "main": [
+        [
+          {
+            "node": "Query Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Contacts": {
+      "main": [
+        [
+          {
+            "node": "Query open automated Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query open automated Tasks": {
+      "main": [
+        [
+          {
+            "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan": {
+      "main": [
+        [
+          {
+            "node": "Update Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Contacts": {
+      "main": [
+        [
+          {
+            "node": "Create Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tasks": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summary": {
+      "main": [
+        [
+          {
+            "node": "Archive file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}
