@@ -37,6 +37,7 @@ Signal sources ──► Clay table ──► n8n ──► Salesforce
 | 3.5 | Field mapping and write-back rules | Done (`docs/salesforce_schema.md`, `n8n/lib/mapping.js`) |
 | 4 | Salesforce upserts via n8n | Done — 19 Accounts, 38 Signals, 14 Contacts, 0 errors (`n8n/workflows/clay_to_salesforce.json`) |
 | 5 | Claude + MCP: rationale, drafts, tasks | Done — 14 rationales, 13 test-inbox Gmail drafts, 14 Tasks (`prompts/why_now_and_email.md`, `n8n/workflows/outreach_to_salesforce.json`) |
+| 5.5 | Account routing to AEs/BDRs (territory, capacity, tenure, OOO) | Done — 14 A/B accounts routed (AE: Maya 10, Priya 4; BDR: Lucas 10, Daniel 4, Hannah's East accounts on OOO coverage), Tier C in RevOps queue (`n8n/workflows/route_accounts.json`, decision #47) |
 | 6 | Reporting, completeness checks, README polish | Not started |
 
 ## Backlog (after the base build ships)

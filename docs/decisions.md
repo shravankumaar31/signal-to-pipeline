@@ -367,3 +367,21 @@ work around a tool limit, or fix a data-quality problem.
 - Problems fixed: (1) Task.Type isn't available in this org ("No such column 'Type'") → dropped; subject, priority and description carry the type. (2) Automation_Reason__c is a restricted picklist → added "Tier B Outreach" and "LinkedIn Outreach" (metadata deploy). (3) Installing node@22 upgraded simdjson and broke Homebrew's Node 25 (and with it the sf CLI) → `brew upgrade node` (now 26.12); n8n stays on Node 22.
 - Why this split: Claude does the judgment (wording grounded in the signals), n8n does the deterministic writes (idempotent, logged). No API key or per-token cost in this phase; moving the Claude step into n8n via the Anthropic API is the path to unattended runs.
 - Note: the Gmail connector is the …96 account; drafts are addressed to the …95 address. Nothing is sent automatically.
+
+## #47 — Account routing: territory first, capacity and tenure aware, OOO coverage
+- Date: 2026-10-15
+- Status: Done — deployed, roster seeded, HQ regions backfilled (Phase 4 re-run: 19/38/14 updated, 0 errors), dry run reviewed, live run applied 2026-10-15
+- Context: after Phases 4–5 every Account, Contact and automated Task was owned by the admin (RevOps). Work needs to land with the 2 AEs and 3 BDRs.
+- Decision / Solution: an n8n workflow (`n8n/workflows/route_accounts.json`, built from `n8n/lib/routing.js` + `salesforce/territories.csv`) that runs between the Phase 4 load and Phase 5 outreach.
+  - Roles: AE = Account owner (Contacts follow); BDR = `Account.BDR__c` (open automated Tasks follow, AE if no BDR).
+  - Scope: Tier A/B only. Tier C stays with the RevOps queue (the admin user).
+  - Order: Tier A first, then by score. Territory rep (from `HQ_Region__c`) if eligible; else overflow — Tier A → highest quota attainment, Tier B → most spare capacity.
+  - Eligible = available, under `Max_Accounts__c`, and not ramping for Tier A. Ramping = first 90 days after `Rep_Start_Date__c`: half capacity, no Tier A.
+  - Out of Office (`Routing_Status__c` + `OOO_Until__c`): temporary coverage, home rep kept in `Home_AE__c` / `Home_BDR__c`, returns automatically after the OOO date. Inactive: permanent reassignment; if nobody is eligible the account goes back to the RevOps queue.
+  - Sticky: a routed account only moves when its rep is away/inactive or its home rep is back. Every change writes `Territory__c`, `Routing_Reason__c` (plain-English why) and `Routing_Date__c`.
+  - `Config.dryRun = true` plans without writing; flip to false to apply.
+- Inputs: 6 User fields (Routing Status, OOO Until, Rep Start Date, Quota Amount, Quota Attainment, Max Accounts) seeded from `salesforce/rep_capacity.csv` by `scripts/seed_rep_capacity.sh`; `HQ_Region__c` added to the Phase 4 mapping (backfilled by re-running Phase 4).
+- Tests: `node n8n/test_routing.js <accounts.csv>` — 6 scenarios: initial (AE Maya 10 / Priya 4; BDR Lucas 10 / Daniel 4), idempotent re-run (0 updates), Hannah back from OOO (gets 4 East accounts), Maya OOO (Priya covers 1 Tier B up to her ramp cap), Maya back (account returns), Lucas inactive (reassigned; 2 Tier A with no eligible BDR → queue).
+- Problems fixed: (1) the test CSV parser dropped the last row (no trailing newline), which looked like one unassigned account per role. (2) `sf data update record --where` takes space-separated field=value pairs, not SOQL (`AND` failed). (3) Importing a workflow JSON into an existing canvas duplicates nodes with a "1" suffix and breaks `$('Node')` references → always import into a new empty workflow. (4) Deployed fields are not added to page layouts → added a Routing section to Account Layout (layout changes take a minute to show).
+- Why: territory keeps rep–account fit and familiarity; capacity caps stop the top rep from drowning; ramp rules protect Tier A conversion; reasons on every record make routing auditable for reps and managers.
+- Trade-off: rules live in code, not in Salesforce assignment rules, so admins change them in `routing.js` (tested) rather than in Setup. Attainment is a manual input until it is calculated from Opportunities.

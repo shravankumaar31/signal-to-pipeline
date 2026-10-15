@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Routing_Status__c</fullName>
+    <description>Routing availability (decision #47). Out of Office = temporary coverage; Inactive = permanent reassignment.</description>
+    <label>Routing Status</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Available</fullName><default>true</default><label>Available</label></value>
+            <value><fullName>Out of Office</fullName><default>false</default><label>Out of Office</label></value>
+            <value><fullName>Inactive</fullName><default>false</default><label>Inactive</label></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

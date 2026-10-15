@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Rep_Start_Date__c</fullName>
+    <description>Start date in role; first 90 days = ramping (half capacity, no Tier A).</description>
+    <label>Rep Start Date</label>
+    <required>false</required>
+    <type>Date</type>
+</CustomField>

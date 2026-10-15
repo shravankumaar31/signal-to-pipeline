@@ -1,0 +1,456 @@
+{
+  "name": "Routing \u2013 auto-assign Accounts to AE / BDR",
+  "nodes": [
+    {
+      "id": "37e51d69-e94c-5828-b503-c79c17d22f8b",
+      "name": "Run routing",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "1dc0f343-792c-547b-8ab8-0aa41ac04c18",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: {\n  sfBase: 'https://orgfarm-ae663148a7-dev-ed.develop.my.salesforce.com/services/data/v62.0',\n  dryRun: true,              // true = plan only, nothing is written. Set to false to apply.\n  queueProfile: 'System Administrator',   // RevOps queue = the first active admin (you); Tier C and unassignable accounts stay here\n  runAt: new Date().toISOString(),\n} }];"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "a9efb63d-1d1a-5078-a415-8cffd4f68dc6",
+      "name": "Query sales reps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, Alias, Name, Title, IsActive, Routing_Status__c, OOO_Until__c, Rep_Start_Date__c, Quota_Attainment__c, Max_Accounts__c FROM User WHERE Department = 'Sales'"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "1a5f929d-c150-508a-be12-2d75fc1dd4f9",
+      "name": "Query RevOps queue user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, Name FROM User WHERE IsActive = true AND UserType = 'Standard' AND Profile.Name = 'System Administrator' AND Department != 'Sales' ORDER BY CreatedDate LIMIT 1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "bbeedfe7-a66f-50d2-aabe-6ec65ea5bf9b",
+      "name": "Query Accounts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, Name, Domain__c, Signal_Tier__c, Signal_Score__c, HQ_Region__c, OwnerId, BDR__c, Home_AE__c, Home_BDR__c FROM Account WHERE Domain__c != null"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "b9665851-146a-5d7e-b7dd-c338fe1a4222",
+      "name": "Query Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, AccountId, OwnerId FROM Contact WHERE AccountId != null AND Account.Domain__c != null"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "7c019f44-ee4d-50ee-afbd-659a6165ecc7",
+      "name": "Query open automated Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, WhatId, OwnerId FROM Task WHERE Created_By_Automation__c = true AND IsClosed = false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "2ac6828f-e2a1-5e23-ad41-e0086c5358af",
+      "name": "Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Account routing engine (decision #47). Pure function, embedded in the n8n Code node and tested\n// locally with `node n8n/test_routing.js`.\n//\n// Roles: AE owns the Account (and its Contacts); BDR works it (Account.BDR__c + open automated Tasks).\n// Per role, Tier A/B accounts only (Tier C stays in the RevOps queue):\n//   pass 1  keep / return-to-home for routed accounts whose rep is available; territory rep for new accounts\n//   pass 2  everything left: coverage (rep OOO, home kept), overflow or inactive reassignment (new home)\n// Eligible rep = available (not OOO, not inactive), under capacity, and not ramping when the account is Tier A.\n// Ramping = first RAMP_DAYS after start date: capacity halved, no Tier A.\n// Overflow pick: Tier A -> highest quota attainment; Tier B -> most spare capacity (then attainment, then alias).\n\nconst ROUTING = { RAMP_DAYS: 90, ROLES: { AE: { field: 'OwnerId', home: 'Home_AE__c' }, BDR: { field: 'BDR__c', home: 'Home_BDR__c' } } };\n\nfunction daysBetween(a, b) { return Math.floor((Date.parse(b) - Date.parse(a)) / 86400000); }\n\nfunction repState(rep, today) {\n  if (!rep.isActive || rep.status === 'Inactive') return 'inactive';\n  if (rep.status === 'Out of Office' && (!rep.oooUntil || rep.oooUntil >= today)) return 'ooo';\n  return 'available'; // OOO with a past return date counts as back\n}\n\nfunction route({ reps, accounts, territories, today, nowIso, queueId }) {\n  const byId = Object.fromEntries(reps.map(r => [r.id, r]));\n  const byAlias = Object.fromEntries(reps.map(r => [r.alias, r]));\n  for (const r of reps) {\n    r.state = repState(r, today);\n    r.ramping = !!r.startDate && daysBetween(r.startDate, today) < ROUTING.RAMP_DAYS;\n    r.cap = r.ramping ? Math.floor((r.max || 0) / 2) : (r.max || 0);\n    r.load = 0;\n  }\n  const work = accounts.filter(a => a.tier === 'A' || a.tier === 'B')\n    .sort((x, y) => (x.tier === y.tier ? (y.score || 0) - (x.score || 0) : (x.tier < y.tier ? -1 : 1)));\n  // current loads (routed A/B accounts only)\n  for (const a of work) for (const role of ['AE', 'BDR']) {\n    const cur = byId[a[ROUTING.ROLES[role].field]];\n    if (cur && cur.role === role) cur.load++;\n  }\n  const result = {};       // accountId -> { changes, notes: { AE, BDR } }\n  const note = (a, role, text) => { (result[a.id] = result[a.id] || { changes: {}, notes: {} }).notes[role] = text; };\n  const set = (a, f, v) => { if ((a[f] || null) !== (v || null)) { (result[a.id] = result[a.id] || { changes: {}, notes: {} }).changes[f] = v; a[f] = v; } };\n  const tierOk = (r, tier) => !(tier === 'A' && r.ramping);\n  const fits = (r, tier) => r && r.state === 'available' && r.load < r.cap && tierOk(r, tier);\n  const move = (a, role, from, to) => { if (from && from.role === role) from.load--; to.load++; set(a, ROUTING.ROLES[role].field, to.id); };\n  const label = r => `${r.name} (${r.load}/${r.cap}${r.ramping ? ', ramping' : ''})`;\n  function pick(role, tier, exclude) {\n    const c = reps.filter(r => r.role === role && !exclude.includes(r.id) && fits(r, tier));\n    c.sort((x, y) => tier === 'A'\n      ? (y.attainment - x.attainment) || ((y.cap - y.load) - (x.cap - x.load)) || x.alias.localeCompare(y.alias)\n      : ((y.cap - y.load) - (x.cap - x.load)) || (y.attainment - x.attainment) || x.alias.localeCompare(y.alias));\n    return c[0] || null;\n  }\n\n  for (const role of ['AE', 'BDR']) {\n    const R = ROUTING.ROLES[role], pending = [];\n    // pass 1\n    for (const a of work) {\n      const terr = territories[a.region] || null;\n      if (terr) set(a, 'Territory__c', terr.territory);\n      const T = terr ? byAlias[role === 'AE' ? terr.ae : terr.bdr] : null;\n      const cur = byId[a[R.field]];\n      const home = byId[a[R.home]];\n      if (cur && cur.role === role) {                       // already routed\n        if (cur.state !== 'available') { pending.push({ a, T, cur, why: cur.state }); continue; }\n        if (home && home.id !== cur.id && fits(home, a.tier)) { move(a, role, cur, home); note(a, role, `${role} back to home rep ${label(home)}`); }\n        continue;                                           // sticky\n      }\n      if (!T) { note(a, role, `${role}: no territory for region \"${a.region || '?'}\", left in RevOps queue`); continue; }\n      if (fits(T, a.tier)) { move(a, role, null, T); set(a, R.home, T.id); note(a, role, `${role} ${terr.territory} territory \u2192 ${label(T)}`); }\n      else pending.push({ a, T, cur: null, why: T.state !== 'available' ? T.state : (!tierOk(T, a.tier) ? 'ramping' : 'capacity') });\n    }\n    // pass 2\n    for (const p of pending) {\n      const { a, T, cur, why } = p;\n      const away = cur || T;\n      const coverage = why === 'ooo' && tierOk(away, a.tier);\n      const c = pick(role, a.tier, [away.id]);\n      if (!c) {\n        if (cur && why === 'inactive') {                    // never leave work with an inactive rep\n          cur.load--; set(a, R.field, role === 'AE' ? (queueId || null) : null);\n          note(a, role, `${role}: ${cur.name} inactive, no eligible rep \u2192 RevOps queue`);\n        } else note(a, role, `${role}: no eligible rep (${away.name} ${why}); ${cur ? 'kept with ' + cur.name : 'left in RevOps queue'}`);\n        continue;\n      }\n      move(a, role, cur && cur.role === role ? cur : null, c);\n      if (coverage) set(a, R.home, a[R.home] || away.id);\n      else set(a, R.home, c.id);\n      const rule = a.tier === 'A' ? `top attainment ${c.attainment}%` : 'most capacity';\n      note(a, role, coverage\n        ? `${role} coverage for ${away.name} (OOO${away.oooUntil ? ' until ' + away.oooUntil : ''}) \u2192 ${label(c)}`\n        : `${role} overflow: ${away.name} ${why} \u2192 ${label(c)} [Tier ${a.tier}: ${rule}]`);\n    }\n  }\n\n  const updates = [];\n  for (const a of work) {\n    const r = result[a.id];\n    if (!r || !Object.keys(r.changes).length) continue;\n    const reason = ['AE', 'BDR'].map(k => r.notes[k]).filter(Boolean).join(' | ');\n    updates.push(Object.assign({ Id: a.id }, r.changes, { Routing_Reason__c: reason.slice(0, 255), Routing_Date__c: nowIso }));\n  }\n  const repSummary = reps.map(r => ({ rep: r.name, role: r.role, state: r.state, ramping: r.ramping, load: r.load, cap: r.cap }));\n  return { updates, repSummary, final: Object.fromEntries(work.map(a => [a.id, { AE: a.OwnerId, BDR: a.BDR__c, homeAE: a.Home_AE__c, homeBDR: a.Home_BDR__c }])) };\n}\n\n\nconst TERRITORIES = {\"AK\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"AZ\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"CA\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"CO\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"HI\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"ID\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"MT\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"NV\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"NM\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"OR\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"UT\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"WA\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"WY\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"BC\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"AB\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"YT\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"NT\":{\"territory\":\"West\",\"ae\":\"mchen\",\"bdr\":\"lromero\"},\"AR\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"IA\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"IL\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"IN\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"KS\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"LA\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"MI\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"MN\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"MO\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"ND\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"NE\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"OH\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"OK\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"SD\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"TX\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"WI\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"SK\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"MB\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"NU\":{\"territory\":\"Central\",\"ae\":\"praman\",\"bdr\":\"dokafor\"},\"AL\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"CT\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"DC\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"DE\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"FL\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"GA\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"KY\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"MA\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"MD\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"ME\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"MS\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"NC\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"NH\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"NJ\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"NY\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"PA\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"RI\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"SC\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"TN\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"VA\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"VT\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"WV\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"ON\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"QC\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"NB\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"NS\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"PE\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"},\"NL\":{\"territory\":\"East\",\"ae\":\"praman\",\"bdr\":\"hbrooks\"}};\nconst cfg = $('Config').first().json;\nconst recs = n => $(n).first().json.records || [];\nconst queueId = (recs('Query RevOps queue user')[0] || {}).Id;\nif (!queueId) throw new Error('RevOps queue user not found (Config.queueProfile)');\nconst reps = recs('Query sales reps').map(u => ({\n  id: u.Id, alias: u.Alias, name: u.Name,\n  role: /account executive/i.test(u.Title || '') ? 'AE' : /business development/i.test(u.Title || '') ? 'BDR' : null,\n  isActive: u.IsActive, status: u.Routing_Status__c || 'Available', oooUntil: u.OOO_Until__c, startDate: u.Rep_Start_Date__c,\n  attainment: Number(u.Quota_Attainment__c || 0), max: Number(u.Max_Accounts__c || 0),\n})).filter(r => r.role);\nconst accounts = recs('Query Accounts').map(a => ({\n  id: a.Id, name: a.Name, tier: a.Signal_Tier__c, score: a.Signal_Score__c, region: a.HQ_Region__c,\n  OwnerId: a.OwnerId, BDR__c: a.BDR__c, Home_AE__c: a.Home_AE__c, Home_BDR__c: a.Home_BDR__c,\n}));\nconst r = route({ reps, accounts, territories: TERRITORIES, today: cfg.runAt.slice(0, 10), nowIso: cfg.runAt, queueId });\nconst accountUpdates = r.updates.map(u => Object.assign({ attributes: { type: 'Account' } }, u));\n// Contacts follow the AE (Account owner); open automated Tasks follow the BDR (AE if no BDR)\nconst contactUpdates = [], taskUpdates = [];\nfor (const c of recs('Query Contacts')) {\n  const f = r.final[c.AccountId];\n  if (f && f.AE && c.OwnerId !== f.AE) contactUpdates.push({ attributes: { type: 'Contact' }, Id: c.Id, OwnerId: f.AE });\n}\nfor (const t of recs('Query open automated Tasks')) {\n  const f = r.final[t.WhatId], o = f && (f.BDR || f.AE);\n  if (o && t.OwnerId !== o) taskUpdates.push({ attributes: { type: 'Task' }, Id: t.Id, OwnerId: o });\n}\nconst nameOf = Object.fromEntries(accounts.map(a => [a.id, a.name]));\nconst plan = r.updates.map(u => ({ account: nameOf[u.Id], reason: u.Routing_Reason__c }));\nreturn [{ json: { dryRun: cfg.dryRun, accountUpdates, contactUpdates, taskUpdates, plan, reps: r.repSummary } }];\n"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "dd398fc3-b638-5cb0-9029-d5e6a6f1e55e",
+      "name": "Update Accounts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.sfBase }}/composite/sobjects",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ allOrNone: false, records: $('Config').first().json.dryRun ? [] : $('Plan').first().json.accountUpdates }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "12469b24-ad56-524c-ad82-1b783a3d3709",
+      "name": "Update Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.sfBase }}/composite/sobjects",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ allOrNone: false, records: $('Config').first().json.dryRun ? [] : $('Plan').first().json.contactUpdates }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "f0b8d059-b2a9-5ed1-a4b3-c5af238a615a",
+      "name": "Update Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.sfBase }}/composite/sobjects",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ allOrNone: false, records: $('Config').first().json.dryRun ? [] : $('Plan').first().json.taskUpdates }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "91d5bc3e-1051-5c3b-b2cd-703bd11ea444",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst p = $('Plan').first().json;\nfunction res(node, sent) {\n  if (p.dryRun || !sent.length) return { ok: 0, errors: [] };\n  const j = $(node).first().json, body = Array.isArray(j.body) ? j.body : [];\n  if (!body.length) return { ok: 0, errors: [{ status: j.statusCode, error: JSON.stringify(j.body).slice(0, 400) }] };\n  return { ok: body.filter(b => b.success).length, errors: body.filter(b => !b.success).map(b => JSON.stringify(b.errors).slice(0, 300)) };\n}\nconst a = res('Update Accounts', p.accountUpdates), c = res('Update Contacts', p.contactUpdates), t = res('Update Tasks', p.taskUpdates);\nreturn [{ json: { runAt: $('Config').first().json.runAt, dryRun: p.dryRun,\n  planned: { accounts: p.accountUpdates.length, contacts: p.contactUpdates.length, tasks: p.taskUpdates.length },\n  written: { accounts: a.ok, contacts: c.ok, tasks: t.ok }, errors: a.errors.length + c.errors.length + t.errors.length,\n  errorDetail: [...a.errors, ...c.errors, ...t.errors], reps: p.reps, plan: p.plan } }];\n"
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Run routing": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Query sales reps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query sales reps": {
+      "main": [
+        [
+          {
+            "node": "Query RevOps queue user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query RevOps queue user": {
+      "main": [
+        [
+          {
+            "node": "Query Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Accounts": {
+      "main": [
+        [
+          {
+            "node": "Query Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Contacts": {
+      "main": [
+        [
+          {
+            "node": "Query open automated Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query open automated Tasks": {
+      "main": [
+        [
+          {
+            "node": "Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan": {
+      "main": [
+        [
+          {
+            "node": "Update Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Accounts": {
+      "main": [
+        [
+          {
+            "node": "Update Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Contacts": {
+      "main": [
+        [
+          {
+            "node": "Update Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Tasks": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}

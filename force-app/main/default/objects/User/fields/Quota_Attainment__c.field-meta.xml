@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Quota_Attainment__c</fullName>
+    <description>Quota attainment to date; Tier A overflow goes to the highest.</description>
+    <label>Quota Attainment</label>
+    <precision>5</precision>
+    <required>false</required>
+    <scale>1</scale>
+    <type>Percent</type>
+</CustomField>

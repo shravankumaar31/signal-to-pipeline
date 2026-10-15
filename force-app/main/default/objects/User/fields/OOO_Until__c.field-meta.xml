@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>OOO_Until__c</fullName>
+    <description>Last day out of office; routing treats the rep as back the day after.</description>
+    <label>OOO Until</label>
+    <required>false</required>
+    <type>Date</type>
+</CustomField>

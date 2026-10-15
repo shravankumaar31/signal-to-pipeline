@@ -131,6 +131,7 @@ function mapAccount(row, existing, runAt) {
     Employee_Range__c: employeeRange(row['Employees (exact)'], row['Employee Band']),
     BillingCity: clean(row['HQ City']) || null,
     BillingCountry: MAP.COUNTRY[country] || clean(row['HQ Country Name']) || country || null,
+    HQ_Region__c: clean(row['HQ Region']).toUpperCase().slice(0, 10) || null,   // routing (decision #47)
     LinkedIn_Company_URL__c: clean(row['Url']) || null,
     Funding_Stage__c: fundingStage(row['Funding Stage']),
     Last_Funding_Amount__c: num(row['Last Funding Amount']),

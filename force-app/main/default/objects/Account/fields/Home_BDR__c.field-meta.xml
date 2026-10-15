@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Home_BDR__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>BDR the account returns to after OOO coverage.</description>
+    <label>Home BDR</label>
+    <referenceTo>User</referenceTo>
+    <relationshipName>Home_BDR_Accounts</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+</CustomField>
