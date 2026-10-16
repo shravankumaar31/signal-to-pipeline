@@ -107,6 +107,7 @@ All three are generated from code (`n8n/build_*.py`) and import as JSON.
 | 3 · Clay | 2 linked tables. 14 primary contacts, 13 verified work emails, 1 LinkedIn-only, 40 credits used |
 | 4 · Load | 19 Accounts, 38 Signals and 14 Contacts upserted, 0 errors. Idempotent re-runs: 0 created, all updated |
 | 5 · Outreach | 14 rationales, 13 Gmail drafts to the test inbox, 1 LinkedIn note, 14 Tasks (Tier A due next day / High; Tier B due in 3 business days) |
+| 5b · Claude in n8n | Same outreach step, now unattended: n8n calls the Claude API (Sonnet 5.5, JSON-schema output), validates every draft (length, greeting, sign-off, no links or emails, no numbers outside the signal data) and saves drafts on the Contact. No email node exists, so nothing can be sent. Live run: 12 of 14 drafts written, 2 held for review, about $0.16 |
 | 5.5 · Routing | AEs: Maya 10, Priya 4 (ramping). BDRs: Lucas 10, Daniel 4 (ramping). Hannah's East accounts are on coverage while she is out of office |
 | 6 · Reporting | 5 reports and a dashboard. 7 accounts flagged for review: 4 with a headcount conflict, 3 to verify CRM |
 
@@ -127,7 +128,7 @@ sf project deploy start --source-dir force-app --target-org signal-dev
 bash scripts/seed_rep_capacity.sh               # rep status, OOO, start date, attainment, capacity
 # 1. Export the Clay tables to data/clay_exports/inbox/ → run "Phase 4 – Clay CSV → Salesforce upsert"
 # 2. Run "Routing – auto-assign Accounts to AE / BDR" (dryRun first)
-# 3. Claude (MCP) writes claude_outreach_<date>.json + test-inbox drafts → run "Phase 5"
+# 3. Run "Phase 5b – Claude outreach in n8n" (useMock / dryRun first) — or the original MCP path ("Phase 5")
 # 4. Re-run Routing so new Tasks land with the BDR
 ```
 
@@ -147,7 +148,7 @@ screenshots/
 
 ## Backlog
 
-- Unattended runs: move the Claude step into n8n via the API and schedule the chain
+- Unattended runs: schedule the chain (Phase 5b runs on the API, decision #50)
 - Signal feedback loop: meeting rate by signal type → recalibrate weights
 - Account brief + daily priority list (BDR); pre-meeting brief from calendar (AE)
 - Reply triage and re-engagement dates; BDR → AE handoff summary

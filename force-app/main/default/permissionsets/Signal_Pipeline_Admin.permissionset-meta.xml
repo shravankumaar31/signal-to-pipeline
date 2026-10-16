@@ -3,6 +3,21 @@
     <description>Read/edit access to all Signal-to-Pipeline fields and the Signal object. Assign to yourself and the integration user.</description>
     <fieldPermissions>
         <editable>true</editable>
+        <field>Contact.Draft_Subject__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Contact.Draft_Body__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Contact.Draft_Generated_At__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>Account.HQ_Region__c</field>
         <readable>true</readable>
     </fieldPermissions>

@@ -1,0 +1,485 @@
+{
+  "name": "Phase 5b \u2013 Claude outreach in n8n (drafts saved, never sent)",
+  "nodes": [
+    {
+      "id": "1188208d-f702-5558-a8f5-fcb689896d7e",
+      "name": "Run Claude outreach",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "b97f243c-e361-5b87-bef7-d3e5501a5586",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: {\n  sfBase: 'https://orgfarm-ae663148a7-dev-ed.develop.my.salesforce.com/services/data/v62.0',\n  model: 'claude-sonnet-5-5',   // or 'claude-haiku-5-5' for a cheaper run\n  useMock: true,                // true = no API call (no key needed). Set false once the \"Anthropic API\" credential exists.\n  dryRun: true,                 // true = generate + validate, write nothing to Salesforce\n  includeExisting: false,       // true = also regenerate contacts that already have a rationale\n  onlyDomains: [],              // e.g. ['keepersecurity.com'] to test on one account\n  maxContacts: 20,              // cost cap per run\n  runAt: new Date().toISOString(),\n} }];"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "e8319e78-0087-590a-9938-8a12590c8f76",
+      "name": "Query Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, AccountId, FirstName, Title, Persona__c, Email_Verification_Status__c, LinkedIn_URL__c, Outreach_Status__c, Why_Now_Rationale__c, Account.Name, Account.Domain__c, Account.Signal_Tier__c, Account.Primary_Signal__c, Account.Open_Sales_Roles_Count__c, Account.Funding_Stage__c, Account.Last_Funding_Amount__c, Account.Last_Funding_Date__c, Account.Incumbent_Comp_Tool__c, Account.BDR__c, Account.OwnerId FROM Contact WHERE Email_Key__c != null AND Account.Signal_Tier__c IN ('A','B')"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "afd5a1ab-8e84-5e5a-b1ea-e400d3b65227",
+      "name": "Query Signals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Account__c, Signal_Type__c, Signal_Date__c, Detail__c, Source_URL__c FROM Signal__c WHERE Account__r.Signal_Tier__c IN ('A','B')"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "c9e4b574-be59-5aaf-9e1e-c36d3dce0195",
+      "name": "Query open automated Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.sfBase }}/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "SELECT Id, WhoId FROM Task WHERE Created_By_Automation__c = true AND IsClosed = false"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "7f5e1116-c658-526f-bf07-92858b294b2c",
+      "name": "Build requests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Claude outreach step inside n8n (decision #50). Pure functions, embedded in the n8n Code nodes and\n// tested locally with `node n8n/test_outreach.js`. Spec: prompts/why_now_and_email.md.\n//\n// Safety: this module only builds requests and validates text. Nothing here (or in the workflow)\n// can send email: drafts are saved to Contact.Draft_Subject__c / Draft_Body__c and the Task description.\n\nconst OUTREACH = {\n  MODEL: 'claude-sonnet-5-5',\n  MAX_TOKENS: 2000,\n  SIGN_OFF: '\u2014 Shravan, Flozero',\n  DRAFT_PREFIX: '[DRAFT] ',\n  BANNED: [/\\bscore/i, /\\btier\\b/i, /\\benrich/i, /\\bclay\\b/i, /\\bscrap/i, /\\bsignal\\b/i],\n  // Only signals inside this window are used in outreach copy\n  MAX_SIGNAL_AGE_DAYS: 120,\n};\n\nconst OUTPUT_SCHEMA = {\n  type: 'object',\n  properties: {\n    why_now: { type: 'string', description: 'Rep-facing rationale, 2-3 sentences, max 400 characters' },\n    email_subject: { type: 'string', description: 'Max 7 words, lower-case style, about their signal. Empty string when channel is LinkedIn.' },\n    email_body: { type: 'string', description: 'Max 90 words. Empty string when channel is LinkedIn.' },\n    linkedin_note: { type: 'string', description: 'Max 300 characters. Empty string when channel is Email.' },\n  },\n  required: ['why_now', 'email_subject', 'email_body', 'linkedin_note'],\n  additionalProperties: false,\n};\n\nconst SYSTEM_PROMPT = [\n  'You write outbound prep for Flozero, a sales-compensation (commissions) platform. Flozero calculates commissions from Salesforce, gives reps live statements, keeps an audit trail and lets ops change plans without code.',\n  'You receive one target contact and their account\\'s buying signals as JSON. Return only the JSON object described by the schema.',\n  '',\n  'Rules for every field:',\n  '- Facts only from the input JSON. Name the specific signal, its date, and its numbers (role title, number of open sales roles, round + amount, new leader). Never invent pains, customers, metrics or claims about the prospect.',\n  '- Signal wording: Hiring RevOps \u2192 use the exact job title from the detail; Sales Team Growth \u2192 \"N sales roles open\"; Funding \u2192 round + amount + month; Leadership Change \u2192 role + month; Competitor Mention \u2192 \"with {tool} in the stack\" and offer a comparison, never disparage the tool.',\n  '- If a hiring detail mentions manual or spreadsheet commission work, you may say the role \"describes manual commission work\", nothing more specific.',\n  '- Never mention scores, tiers, signals, data providers, scraping or enrichment.',\n  '- Do not include email addresses, phone numbers or links anywhere.',\n  '',\n  'why_now (rep-facing, max 400 characters): sentence 1 = the signals with dates; sentence 2 = why this moment matters for commissions; optional sentence 3 = why this persona owns it (or why the channel is LinkedIn).',\n  '',\n  'When channel is \"Email\" or \"Email + LinkedIn\":',\n  '- email_subject: max 7 words, lower-case style, about their situation, not about Flozero.',\n  '- email_body: max 90 words. First line \"Hi {first_name},\" \u2192 the signal observation \u2192 what it usually means for commissions \u2192 one Flozero line \u2192 one low-friction CTA (a 20-minute call). Last line exactly \"\u2014 Shravan, Flozero\".',\n  '- Persona angle: RevOps / Sales Ops / Comp \u2192 calc effort, disputes, plan changes, audit trail. CRO / VP Sales \u2192 rep trust in payouts, manager time, ramp. CFO / Finance \u2192 accruals, controls, one number.',\n  '- linkedin_note: \"\" (or a note if channel is \"Email + LinkedIn\").',\n  '',\n  'When channel is \"LinkedIn Task\": email_subject and email_body are \"\". linkedin_note: max 300 characters, congratulates on the signal, says what you work on, no pitch, no link.',\n].join('\\n');\n\nfunction clean(v) { return v === undefined || v === null ? '' : String(v).trim(); }\nfunction words(s) { return clean(s).split(/\\s+/).filter(Boolean).length; }\n\n// Channel from verification status (same rule as the Clay \"Outreach Channel\" column, decision #42)\nfunction channelFor(contact) {\n  const v = clean(contact.Email_Verification_Status__c);\n  if (v === 'Valid') return 'Email';\n  if (v === 'Catch-all') return 'Email + LinkedIn';\n  return clean(contact.LinkedIn_URL__c) ? 'LinkedIn Task' : 'Manual Research';\n}\n\nfunction daysBetween(a, b) { return Math.floor((Date.parse(b) - Date.parse(a)) / 86400000); }\n\n// Builds the per-contact context sent to Claude. Company-level facts + the contact's first name and title.\nfunction buildContext(contact, signals, today) {\n  const a = contact.Account || {};\n  const sig = (signals || [])\n    .filter(s => !s.Signal_Date__c || daysBetween(s.Signal_Date__c, today) <= OUTREACH.MAX_SIGNAL_AGE_DAYS)\n    .sort((x, y) => clean(y.Signal_Date__c).localeCompare(clean(x.Signal_Date__c)))\n    .map(s => ({ type: s.Signal_Type__c, date: s.Signal_Date__c || null, detail: clean(s.Detail__c) || null, source_url: s.Source_URL__c || null }));\n  return {\n    contact_id: contact.Id,\n    account_id: contact.AccountId,\n    account: a.Name,\n    domain: a.Domain__c,\n    tier: a.Signal_Tier__c,\n    primary_signal: a.Primary_Signal__c || null,\n    open_sales_roles: a.Open_Sales_Roles_Count__c || null,\n    funding_stage: a.Funding_Stage__c || null,\n    last_funding_amount: a.Last_Funding_Amount__c || null,\n    last_funding_date: a.Last_Funding_Date__c || null,\n    incumbent_comp_tool: a.Incumbent_Comp_Tool__c && a.Incumbent_Comp_Tool__c !== 'Unknown' ? a.Incumbent_Comp_Tool__c : null,\n    first_name: clean(contact.FirstName).replace(/[.,;:]+$/, ''),   // \"Ed.\" \u2192 \"Ed\" (greeting check)\n    title: clean(contact.Title),\n    persona: contact.Persona__c || null,\n    channel: channelFor(contact),\n    signals: sig,\n    owner_id: a.BDR__c || a.OwnerId,   // Task owner: BDR (routing), else AE\n  };\n}\n\n// Only the fields Claude needs (no ids, no owner)\nfunction promptPayload(ctx) {\n  const { contact_id, account_id, owner_id, domain, tier, ...rest } = ctx;\n  return rest;\n}\n\nfunction buildRequest(ctx, model) {\n  return {\n    model: model || OUTREACH.MODEL,\n    max_tokens: OUTREACH.MAX_TOKENS,\n    system: SYSTEM_PROMPT,\n    messages: [{ role: 'user', content: 'Write the outreach prep for this contact.\\n\\n' + JSON.stringify(promptPayload(ctx), null, 2) }],\n    output_config: { format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },\n  };\n}\n\n// Parses a Messages API response (or an error body) into { out, error, usage }\nfunction parseResponse(resp) {\n  const body = resp && resp.body !== undefined ? resp.body : resp;\n  const status = resp && resp.statusCode;\n  if (status && status >= 300) return { error: 'HTTP ' + status + ': ' + JSON.stringify(body).slice(0, 300) };\n  if (!body || !Array.isArray(body.content)) return { error: 'No content in response: ' + JSON.stringify(body).slice(0, 300) };\n  if (body.stop_reason && !['end_turn', 'stop_sequence'].includes(body.stop_reason)) return { error: 'stop_reason ' + body.stop_reason };\n  const text = (body.content.find(b => b.type === 'text') || {}).text;\n  if (!text) return { error: 'No text block' };\n  try { return { out: JSON.parse(text), usage: body.usage || null }; }\n  catch (e) { return { error: 'Invalid JSON: ' + text.slice(0, 200) }; }\n}\n\n// Every number in the copy must exist in the input facts (hallucination guard)\nfunction unknownNumbers(text, ctx) {\n  const facts = JSON.stringify(promptPayload(ctx)).replace(/,/g, '');\n  const found = (clean(text).replace(/,/g, '').match(/\\d+(?:\\.\\d+)?/g) || []);\n  return found.filter(n => {\n    if (facts.includes(n)) return false;\n    const num = Number(n);\n    if (/^20\\d\\d$/.test(n)) return false;                 // years\n    if (num === 20 && /20[- ]minute/i.test(text)) return false;   // the CTA\n    // amounts written short: \"$50M\" \u2194 50000000, \"$1.2B\" \u2194 1200000000\n    for (const mult of [1e3, 1e6, 1e9]) if (facts.includes(String(Math.round(num * mult)))) return false;\n    return true;\n  });\n}\n\nfunction validate(out, ctx) {\n  const errors = [];\n  const o = out || {};\n  const why = clean(o.why_now), subj = clean(o.email_subject), body = clean(o.email_body), note = clean(o.linkedin_note);\n  if (!why) errors.push('why_now empty');\n  if (why.length > 400) errors.push('why_now > 400 chars (' + why.length + ')');\n  const all = [why, subj, body, note].join('\\n');\n  if (/[\\w.+-]+@[\\w-]+\\.[\\w.]+/.test(all)) errors.push('contains an email address');\n  if (/https?:\\/\\/|www\\./i.test(all)) errors.push('contains a link');\n  for (const re of OUTREACH.BANNED) if (re.test([subj, body, note].join('\\n'))) errors.push('prospect-facing copy uses banned word ' + re);\n  const nums = unknownNumbers(all, ctx);\n  if (nums.length) errors.push('numbers not in input facts: ' + nums.join(', '));\n  if (ctx.channel === 'Email' || ctx.channel === 'Email + LinkedIn') {\n    if (!subj) errors.push('email_subject empty');\n    if (words(subj) > 7) errors.push('subject > 7 words');\n    if (!body) errors.push('email_body empty');\n    if (words(body.replace(OUTREACH.SIGN_OFF, '')) > 90) errors.push('email_body > 90 words (' + words(body) + ')');\n    if (ctx.first_name && !body.startsWith('Hi ' + ctx.first_name)) errors.push('greeting is not \"Hi ' + ctx.first_name + ',\"');\n    if (!body.trim().endsWith(OUTREACH.SIGN_OFF)) errors.push('missing sign-off');\n  }\n  if (ctx.channel === 'LinkedIn Task') {\n    if (!note) errors.push('linkedin_note empty');\n    if (note.length > 300) errors.push('linkedin_note > 300 chars');\n  }\n  return errors;\n}\n\nfunction addBusinessDays(iso, n) {\n  const d = new Date(iso + 'T12:00:00Z');\n  while (n > 0) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) n--; }\n  return d.toISOString().slice(0, 10);\n}\n\n// Salesforce writes for one validated output. Drafts are stored, never sent.\nfunction writesFor(ctx, out, today, nowIso, existingStatus, hasOpenTask) {\n  const isEmail = ctx.channel === 'Email' || ctx.channel === 'Email + LinkedIn';\n  const contact = {\n    attributes: { type: 'Contact' }, Id: ctx.contact_id,\n    Why_Now_Rationale__c: clean(out.why_now),\n    Draft_Subject__c: isEmail ? (OUTREACH.DRAFT_PREFIX + clean(out.email_subject)).slice(0, 255) : null,\n    Draft_Body__c: isEmail ? clean(out.email_body) + (clean(out.linkedin_note) ? '\\n\\n--- LinkedIn note ---\\n' + clean(out.linkedin_note) : '')\n                           : (clean(out.linkedin_note) ? '--- LinkedIn note ---\\n' + clean(out.linkedin_note) : null),\n    Draft_Generated_At__c: nowIso,\n  };\n  if (!existingStatus || existingStatus === 'Not Started') contact.Outreach_Status__c = 'Drafted';\n  if (hasOpenTask || ctx.channel === 'Manual Research') return { contact, task: null };\n  const tierA = ctx.tier === 'A';\n  const linkedin = ctx.channel === 'LinkedIn Task';\n  const primary = ctx.primary_signal || (ctx.signals[0] && ctx.signals[0].type) || 'Signal';\n  const src = (ctx.signals.find(s => s.source_url) || {}).source_url;\n  const task = {\n    attributes: { type: 'Task' }, WhoId: ctx.contact_id, WhatId: ctx.account_id, OwnerId: ctx.owner_id,\n    Subject: linkedin ? `Tier ${ctx.tier} \u2013 LinkedIn connect \u2013 ${ctx.account}` : `Tier ${ctx.tier} \u2013 ${primary} \u2013 ${ctx.account}`,\n    ActivityDate: addBusinessDays(today, tierA ? 1 : 3),\n    Priority: tierA ? 'High' : 'Normal', Status: 'Not Started',\n    Description: ['Why now: ' + clean(out.why_now), '',\n      linkedin ? 'Next step: send the LinkedIn note saved in Draft Body on the Contact.'\n               : 'Next step: review the draft saved on the Contact (Draft Subject / Draft Body), edit, then send it yourself. Drafts are never sent automatically.',\n      src ? '\\nSignal source: ' + src : ''].join('\\n').trim(),\n    Created_By_Automation__c: true,\n    Automation_Reason__c: linkedin ? 'LinkedIn Outreach' : tierA ? 'Tier A Outreach' : 'Tier B Outreach',\n  };\n  return { contact, task };\n}\n\n// Stand-in for Claude while there is no API key: same response shape, built only from the input facts\nfunction mockResponse(ctx) {\n  const s = ctx.signals[0] || { type: ctx.primary_signal || 'Hiring RevOps', date: null, detail: '' };\n  const when = s.date ? new Date(s.date + 'T12:00:00Z').toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : 'recently';\n  const what = s.type === 'Sales Team Growth' && ctx.open_sales_roles ? `${ctx.open_sales_roles} sales roles open`\n    : s.type === 'Funding' && ctx.funding_stage ? `the ${ctx.funding_stage} round`\n    : s.type === 'Hiring RevOps' ? 'the new RevOps hire' : s.type.toLowerCase();\n  const out = {\n    why_now: `${ctx.account} shows ${what} (${when}). Growth like this multiplies plan changes and payout questions, so commissions are worth automating now.`,\n    email_subject: ctx.channel === 'LinkedIn Task' ? '' : `commissions as ${ctx.account.toLowerCase()} grows`,\n    email_body: ctx.channel === 'LinkedIn Task' ? '' : [`Hi ${ctx.first_name},`, '',\n      `Saw ${what} at ${ctx.account} (${when}). Teams at that stage usually feel it first in commission calcs and payout questions.`, '',\n      'Flozero calculates commissions straight from Salesforce and gives reps live statements with an audit trail.', '',\n      'Open to a 20-minute look?', '', OUTREACH.SIGN_OFF].join('\\n'),\n    linkedin_note: ctx.channel === 'LinkedIn Task' ? `Congrats on ${what} at ${ctx.account}. I work on commission automation for growing sales teams and would love to connect.` : '',\n  };\n  return { statusCode: 200, body: { content: [{ type: 'text', text: JSON.stringify(out) }], stop_reason: 'end_turn', usage: { input_tokens: 0, output_tokens: 0 }, mock: true } };\n}\n\n\nconst cfg = $('Config').first().json;\nconst today = cfg.runAt.slice(0, 10);\nconst sigBy = {};\nfor (const s of ($('Query Signals').first().json.records || [])) (sigBy[s.Account__c] = sigBy[s.Account__c] || []).push(s);\nconst openTask = new Set(($('Query open automated Tasks').first().json.records || []).map(t => t.WhoId));\nconst only = (cfg.onlyDomains || []).map(d => d.toLowerCase());\nconst out = [];\nfor (const ct of ($('Query Contacts').first().json.records || [])) {\n  const domain = String((ct.Account || {}).Domain__c || '').toLowerCase();\n  if (only.length && !only.includes(domain)) continue;\n  if (ct.Why_Now_Rationale__c && !cfg.includeExisting) continue;\n  const ctx = buildContext(ct, sigBy[ct.AccountId], today);\n  out.push({ json: { ctx, request: buildRequest(ctx, cfg.model), status: ct.Outreach_Status__c || null, hasOpenTask: openTask.has(ct.Id) } });\n  if (out.length >= cfg.maxContacts) break;\n}\nreturn out;   // no items = nothing to do; the run stops here\n"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "6f19fc97-d543-5ead-af98-35a5679c9de8",
+      "name": "Use mock?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "mock",
+              "leftValue": "={{ $('Config').first().json.useMock }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cff31afa-8318-5fe8-b34d-ff2065edd717",
+      "name": "Mock Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        200
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Claude outreach step inside n8n (decision #50). Pure functions, embedded in the n8n Code nodes and\n// tested locally with `node n8n/test_outreach.js`. Spec: prompts/why_now_and_email.md.\n//\n// Safety: this module only builds requests and validates text. Nothing here (or in the workflow)\n// can send email: drafts are saved to Contact.Draft_Subject__c / Draft_Body__c and the Task description.\n\nconst OUTREACH = {\n  MODEL: 'claude-sonnet-5-5',\n  MAX_TOKENS: 2000,\n  SIGN_OFF: '\u2014 Shravan, Flozero',\n  DRAFT_PREFIX: '[DRAFT] ',\n  BANNED: [/\\bscore/i, /\\btier\\b/i, /\\benrich/i, /\\bclay\\b/i, /\\bscrap/i, /\\bsignal\\b/i],\n  // Only signals inside this window are used in outreach copy\n  MAX_SIGNAL_AGE_DAYS: 120,\n};\n\nconst OUTPUT_SCHEMA = {\n  type: 'object',\n  properties: {\n    why_now: { type: 'string', description: 'Rep-facing rationale, 2-3 sentences, max 400 characters' },\n    email_subject: { type: 'string', description: 'Max 7 words, lower-case style, about their signal. Empty string when channel is LinkedIn.' },\n    email_body: { type: 'string', description: 'Max 90 words. Empty string when channel is LinkedIn.' },\n    linkedin_note: { type: 'string', description: 'Max 300 characters. Empty string when channel is Email.' },\n  },\n  required: ['why_now', 'email_subject', 'email_body', 'linkedin_note'],\n  additionalProperties: false,\n};\n\nconst SYSTEM_PROMPT = [\n  'You write outbound prep for Flozero, a sales-compensation (commissions) platform. Flozero calculates commissions from Salesforce, gives reps live statements, keeps an audit trail and lets ops change plans without code.',\n  'You receive one target contact and their account\\'s buying signals as JSON. Return only the JSON object described by the schema.',\n  '',\n  'Rules for every field:',\n  '- Facts only from the input JSON. Name the specific signal, its date, and its numbers (role title, number of open sales roles, round + amount, new leader). Never invent pains, customers, metrics or claims about the prospect.',\n  '- Signal wording: Hiring RevOps \u2192 use the exact job title from the detail; Sales Team Growth \u2192 \"N sales roles open\"; Funding \u2192 round + amount + month; Leadership Change \u2192 role + month; Competitor Mention \u2192 \"with {tool} in the stack\" and offer a comparison, never disparage the tool.',\n  '- If a hiring detail mentions manual or spreadsheet commission work, you may say the role \"describes manual commission work\", nothing more specific.',\n  '- Never mention scores, tiers, signals, data providers, scraping or enrichment.',\n  '- Do not include email addresses, phone numbers or links anywhere.',\n  '',\n  'why_now (rep-facing, max 400 characters): sentence 1 = the signals with dates; sentence 2 = why this moment matters for commissions; optional sentence 3 = why this persona owns it (or why the channel is LinkedIn).',\n  '',\n  'When channel is \"Email\" or \"Email + LinkedIn\":',\n  '- email_subject: max 7 words, lower-case style, about their situation, not about Flozero.',\n  '- email_body: max 90 words. First line \"Hi {first_name},\" \u2192 the signal observation \u2192 what it usually means for commissions \u2192 one Flozero line \u2192 one low-friction CTA (a 20-minute call). Last line exactly \"\u2014 Shravan, Flozero\".',\n  '- Persona angle: RevOps / Sales Ops / Comp \u2192 calc effort, disputes, plan changes, audit trail. CRO / VP Sales \u2192 rep trust in payouts, manager time, ramp. CFO / Finance \u2192 accruals, controls, one number.',\n  '- linkedin_note: \"\" (or a note if channel is \"Email + LinkedIn\").',\n  '',\n  'When channel is \"LinkedIn Task\": email_subject and email_body are \"\". linkedin_note: max 300 characters, congratulates on the signal, says what you work on, no pitch, no link.',\n].join('\\n');\n\nfunction clean(v) { return v === undefined || v === null ? '' : String(v).trim(); }\nfunction words(s) { return clean(s).split(/\\s+/).filter(Boolean).length; }\n\n// Channel from verification status (same rule as the Clay \"Outreach Channel\" column, decision #42)\nfunction channelFor(contact) {\n  const v = clean(contact.Email_Verification_Status__c);\n  if (v === 'Valid') return 'Email';\n  if (v === 'Catch-all') return 'Email + LinkedIn';\n  return clean(contact.LinkedIn_URL__c) ? 'LinkedIn Task' : 'Manual Research';\n}\n\nfunction daysBetween(a, b) { return Math.floor((Date.parse(b) - Date.parse(a)) / 86400000); }\n\n// Builds the per-contact context sent to Claude. Company-level facts + the contact's first name and title.\nfunction buildContext(contact, signals, today) {\n  const a = contact.Account || {};\n  const sig = (signals || [])\n    .filter(s => !s.Signal_Date__c || daysBetween(s.Signal_Date__c, today) <= OUTREACH.MAX_SIGNAL_AGE_DAYS)\n    .sort((x, y) => clean(y.Signal_Date__c).localeCompare(clean(x.Signal_Date__c)))\n    .map(s => ({ type: s.Signal_Type__c, date: s.Signal_Date__c || null, detail: clean(s.Detail__c) || null, source_url: s.Source_URL__c || null }));\n  return {\n    contact_id: contact.Id,\n    account_id: contact.AccountId,\n    account: a.Name,\n    domain: a.Domain__c,\n    tier: a.Signal_Tier__c,\n    primary_signal: a.Primary_Signal__c || null,\n    open_sales_roles: a.Open_Sales_Roles_Count__c || null,\n    funding_stage: a.Funding_Stage__c || null,\n    last_funding_amount: a.Last_Funding_Amount__c || null,\n    last_funding_date: a.Last_Funding_Date__c || null,\n    incumbent_comp_tool: a.Incumbent_Comp_Tool__c && a.Incumbent_Comp_Tool__c !== 'Unknown' ? a.Incumbent_Comp_Tool__c : null,\n    first_name: clean(contact.FirstName).replace(/[.,;:]+$/, ''),   // \"Ed.\" \u2192 \"Ed\" (greeting check)\n    title: clean(contact.Title),\n    persona: contact.Persona__c || null,\n    channel: channelFor(contact),\n    signals: sig,\n    owner_id: a.BDR__c || a.OwnerId,   // Task owner: BDR (routing), else AE\n  };\n}\n\n// Only the fields Claude needs (no ids, no owner)\nfunction promptPayload(ctx) {\n  const { contact_id, account_id, owner_id, domain, tier, ...rest } = ctx;\n  return rest;\n}\n\nfunction buildRequest(ctx, model) {\n  return {\n    model: model || OUTREACH.MODEL,\n    max_tokens: OUTREACH.MAX_TOKENS,\n    system: SYSTEM_PROMPT,\n    messages: [{ role: 'user', content: 'Write the outreach prep for this contact.\\n\\n' + JSON.stringify(promptPayload(ctx), null, 2) }],\n    output_config: { format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },\n  };\n}\n\n// Parses a Messages API response (or an error body) into { out, error, usage }\nfunction parseResponse(resp) {\n  const body = resp && resp.body !== undefined ? resp.body : resp;\n  const status = resp && resp.statusCode;\n  if (status && status >= 300) return { error: 'HTTP ' + status + ': ' + JSON.stringify(body).slice(0, 300) };\n  if (!body || !Array.isArray(body.content)) return { error: 'No content in response: ' + JSON.stringify(body).slice(0, 300) };\n  if (body.stop_reason && !['end_turn', 'stop_sequence'].includes(body.stop_reason)) return { error: 'stop_reason ' + body.stop_reason };\n  const text = (body.content.find(b => b.type === 'text') || {}).text;\n  if (!text) return { error: 'No text block' };\n  try { return { out: JSON.parse(text), usage: body.usage || null }; }\n  catch (e) { return { error: 'Invalid JSON: ' + text.slice(0, 200) }; }\n}\n\n// Every number in the copy must exist in the input facts (hallucination guard)\nfunction unknownNumbers(text, ctx) {\n  const facts = JSON.stringify(promptPayload(ctx)).replace(/,/g, '');\n  const found = (clean(text).replace(/,/g, '').match(/\\d+(?:\\.\\d+)?/g) || []);\n  return found.filter(n => {\n    if (facts.includes(n)) return false;\n    const num = Number(n);\n    if (/^20\\d\\d$/.test(n)) return false;                 // years\n    if (num === 20 && /20[- ]minute/i.test(text)) return false;   // the CTA\n    // amounts written short: \"$50M\" \u2194 50000000, \"$1.2B\" \u2194 1200000000\n    for (const mult of [1e3, 1e6, 1e9]) if (facts.includes(String(Math.round(num * mult)))) return false;\n    return true;\n  });\n}\n\nfunction validate(out, ctx) {\n  const errors = [];\n  const o = out || {};\n  const why = clean(o.why_now), subj = clean(o.email_subject), body = clean(o.email_body), note = clean(o.linkedin_note);\n  if (!why) errors.push('why_now empty');\n  if (why.length > 400) errors.push('why_now > 400 chars (' + why.length + ')');\n  const all = [why, subj, body, note].join('\\n');\n  if (/[\\w.+-]+@[\\w-]+\\.[\\w.]+/.test(all)) errors.push('contains an email address');\n  if (/https?:\\/\\/|www\\./i.test(all)) errors.push('contains a link');\n  for (const re of OUTREACH.BANNED) if (re.test([subj, body, note].join('\\n'))) errors.push('prospect-facing copy uses banned word ' + re);\n  const nums = unknownNumbers(all, ctx);\n  if (nums.length) errors.push('numbers not in input facts: ' + nums.join(', '));\n  if (ctx.channel === 'Email' || ctx.channel === 'Email + LinkedIn') {\n    if (!subj) errors.push('email_subject empty');\n    if (words(subj) > 7) errors.push('subject > 7 words');\n    if (!body) errors.push('email_body empty');\n    if (words(body.replace(OUTREACH.SIGN_OFF, '')) > 90) errors.push('email_body > 90 words (' + words(body) + ')');\n    if (ctx.first_name && !body.startsWith('Hi ' + ctx.first_name)) errors.push('greeting is not \"Hi ' + ctx.first_name + ',\"');\n    if (!body.trim().endsWith(OUTREACH.SIGN_OFF)) errors.push('missing sign-off');\n  }\n  if (ctx.channel === 'LinkedIn Task') {\n    if (!note) errors.push('linkedin_note empty');\n    if (note.length > 300) errors.push('linkedin_note > 300 chars');\n  }\n  return errors;\n}\n\nfunction addBusinessDays(iso, n) {\n  const d = new Date(iso + 'T12:00:00Z');\n  while (n > 0) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) n--; }\n  return d.toISOString().slice(0, 10);\n}\n\n// Salesforce writes for one validated output. Drafts are stored, never sent.\nfunction writesFor(ctx, out, today, nowIso, existingStatus, hasOpenTask) {\n  const isEmail = ctx.channel === 'Email' || ctx.channel === 'Email + LinkedIn';\n  const contact = {\n    attributes: { type: 'Contact' }, Id: ctx.contact_id,\n    Why_Now_Rationale__c: clean(out.why_now),\n    Draft_Subject__c: isEmail ? (OUTREACH.DRAFT_PREFIX + clean(out.email_subject)).slice(0, 255) : null,\n    Draft_Body__c: isEmail ? clean(out.email_body) + (clean(out.linkedin_note) ? '\\n\\n--- LinkedIn note ---\\n' + clean(out.linkedin_note) : '')\n                           : (clean(out.linkedin_note) ? '--- LinkedIn note ---\\n' + clean(out.linkedin_note) : null),\n    Draft_Generated_At__c: nowIso,\n  };\n  if (!existingStatus || existingStatus === 'Not Started') contact.Outreach_Status__c = 'Drafted';\n  if (hasOpenTask || ctx.channel === 'Manual Research') return { contact, task: null };\n  const tierA = ctx.tier === 'A';\n  const linkedin = ctx.channel === 'LinkedIn Task';\n  const primary = ctx.primary_signal || (ctx.signals[0] && ctx.signals[0].type) || 'Signal';\n  const src = (ctx.signals.find(s => s.source_url) || {}).source_url;\n  const task = {\n    attributes: { type: 'Task' }, WhoId: ctx.contact_id, WhatId: ctx.account_id, OwnerId: ctx.owner_id,\n    Subject: linkedin ? `Tier ${ctx.tier} \u2013 LinkedIn connect \u2013 ${ctx.account}` : `Tier ${ctx.tier} \u2013 ${primary} \u2013 ${ctx.account}`,\n    ActivityDate: addBusinessDays(today, tierA ? 1 : 3),\n    Priority: tierA ? 'High' : 'Normal', Status: 'Not Started',\n    Description: ['Why now: ' + clean(out.why_now), '',\n      linkedin ? 'Next step: send the LinkedIn note saved in Draft Body on the Contact.'\n               : 'Next step: review the draft saved on the Contact (Draft Subject / Draft Body), edit, then send it yourself. Drafts are never sent automatically.',\n      src ? '\\nSignal source: ' + src : ''].join('\\n').trim(),\n    Created_By_Automation__c: true,\n    Automation_Reason__c: linkedin ? 'LinkedIn Outreach' : tierA ? 'Tier A Outreach' : 'Tier B Outreach',\n  };\n  return { contact, task };\n}\n\n// Stand-in for Claude while there is no API key: same response shape, built only from the input facts\nfunction mockResponse(ctx) {\n  const s = ctx.signals[0] || { type: ctx.primary_signal || 'Hiring RevOps', date: null, detail: '' };\n  const when = s.date ? new Date(s.date + 'T12:00:00Z').toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : 'recently';\n  const what = s.type === 'Sales Team Growth' && ctx.open_sales_roles ? `${ctx.open_sales_roles} sales roles open`\n    : s.type === 'Funding' && ctx.funding_stage ? `the ${ctx.funding_stage} round`\n    : s.type === 'Hiring RevOps' ? 'the new RevOps hire' : s.type.toLowerCase();\n  const out = {\n    why_now: `${ctx.account} shows ${what} (${when}). Growth like this multiplies plan changes and payout questions, so commissions are worth automating now.`,\n    email_subject: ctx.channel === 'LinkedIn Task' ? '' : `commissions as ${ctx.account.toLowerCase()} grows`,\n    email_body: ctx.channel === 'LinkedIn Task' ? '' : [`Hi ${ctx.first_name},`, '',\n      `Saw ${what} at ${ctx.account} (${when}). Teams at that stage usually feel it first in commission calcs and payout questions.`, '',\n      'Flozero calculates commissions straight from Salesforce and gives reps live statements with an audit trail.', '',\n      'Open to a 20-minute look?', '', OUTREACH.SIGN_OFF].join('\\n'),\n    linkedin_note: ctx.channel === 'LinkedIn Task' ? `Congrats on ${what} at ${ctx.account}. I work on commission automation for growing sales teams and would love to connect.` : '',\n  };\n  return { statusCode: 200, body: { content: [{ type: 'text', text: JSON.stringify(out) }], stop_reason: 'end_turn', usage: { input_tokens: 0, output_tokens: 0 }, mock: true } };\n}\n\n\nreturn $input.all().map(i => ({ json: mockResponse(i.json.ctx) }));"
+      }
+    },
+    {
+      "id": "97f23959-8276-588e-aacf-a20c848ce093",
+      "name": "Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 120000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "44d5fb70-a2ed-57b2-9847-169531497506",
+      "name": "Validate + plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Claude outreach step inside n8n (decision #50). Pure functions, embedded in the n8n Code nodes and\n// tested locally with `node n8n/test_outreach.js`. Spec: prompts/why_now_and_email.md.\n//\n// Safety: this module only builds requests and validates text. Nothing here (or in the workflow)\n// can send email: drafts are saved to Contact.Draft_Subject__c / Draft_Body__c and the Task description.\n\nconst OUTREACH = {\n  MODEL: 'claude-sonnet-5-5',\n  MAX_TOKENS: 2000,\n  SIGN_OFF: '\u2014 Shravan, Flozero',\n  DRAFT_PREFIX: '[DRAFT] ',\n  BANNED: [/\\bscore/i, /\\btier\\b/i, /\\benrich/i, /\\bclay\\b/i, /\\bscrap/i, /\\bsignal\\b/i],\n  // Only signals inside this window are used in outreach copy\n  MAX_SIGNAL_AGE_DAYS: 120,\n};\n\nconst OUTPUT_SCHEMA = {\n  type: 'object',\n  properties: {\n    why_now: { type: 'string', description: 'Rep-facing rationale, 2-3 sentences, max 400 characters' },\n    email_subject: { type: 'string', description: 'Max 7 words, lower-case style, about their signal. Empty string when channel is LinkedIn.' },\n    email_body: { type: 'string', description: 'Max 90 words. Empty string when channel is LinkedIn.' },\n    linkedin_note: { type: 'string', description: 'Max 300 characters. Empty string when channel is Email.' },\n  },\n  required: ['why_now', 'email_subject', 'email_body', 'linkedin_note'],\n  additionalProperties: false,\n};\n\nconst SYSTEM_PROMPT = [\n  'You write outbound prep for Flozero, a sales-compensation (commissions) platform. Flozero calculates commissions from Salesforce, gives reps live statements, keeps an audit trail and lets ops change plans without code.',\n  'You receive one target contact and their account\\'s buying signals as JSON. Return only the JSON object described by the schema.',\n  '',\n  'Rules for every field:',\n  '- Facts only from the input JSON. Name the specific signal, its date, and its numbers (role title, number of open sales roles, round + amount, new leader). Never invent pains, customers, metrics or claims about the prospect.',\n  '- Signal wording: Hiring RevOps \u2192 use the exact job title from the detail; Sales Team Growth \u2192 \"N sales roles open\"; Funding \u2192 round + amount + month; Leadership Change \u2192 role + month; Competitor Mention \u2192 \"with {tool} in the stack\" and offer a comparison, never disparage the tool.',\n  '- If a hiring detail mentions manual or spreadsheet commission work, you may say the role \"describes manual commission work\", nothing more specific.',\n  '- Never mention scores, tiers, signals, data providers, scraping or enrichment.',\n  '- Do not include email addresses, phone numbers or links anywhere.',\n  '',\n  'why_now (rep-facing, max 400 characters): sentence 1 = the signals with dates; sentence 2 = why this moment matters for commissions; optional sentence 3 = why this persona owns it (or why the channel is LinkedIn).',\n  '',\n  'When channel is \"Email\" or \"Email + LinkedIn\":',\n  '- email_subject: max 7 words, lower-case style, about their situation, not about Flozero.',\n  '- email_body: max 90 words. First line \"Hi {first_name},\" \u2192 the signal observation \u2192 what it usually means for commissions \u2192 one Flozero line \u2192 one low-friction CTA (a 20-minute call). Last line exactly \"\u2014 Shravan, Flozero\".',\n  '- Persona angle: RevOps / Sales Ops / Comp \u2192 calc effort, disputes, plan changes, audit trail. CRO / VP Sales \u2192 rep trust in payouts, manager time, ramp. CFO / Finance \u2192 accruals, controls, one number.',\n  '- linkedin_note: \"\" (or a note if channel is \"Email + LinkedIn\").',\n  '',\n  'When channel is \"LinkedIn Task\": email_subject and email_body are \"\". linkedin_note: max 300 characters, congratulates on the signal, says what you work on, no pitch, no link.',\n].join('\\n');\n\nfunction clean(v) { return v === undefined || v === null ? '' : String(v).trim(); }\nfunction words(s) { return clean(s).split(/\\s+/).filter(Boolean).length; }\n\n// Channel from verification status (same rule as the Clay \"Outreach Channel\" column, decision #42)\nfunction channelFor(contact) {\n  const v = clean(contact.Email_Verification_Status__c);\n  if (v === 'Valid') return 'Email';\n  if (v === 'Catch-all') return 'Email + LinkedIn';\n  return clean(contact.LinkedIn_URL__c) ? 'LinkedIn Task' : 'Manual Research';\n}\n\nfunction daysBetween(a, b) { return Math.floor((Date.parse(b) - Date.parse(a)) / 86400000); }\n\n// Builds the per-contact context sent to Claude. Company-level facts + the contact's first name and title.\nfunction buildContext(contact, signals, today) {\n  const a = contact.Account || {};\n  const sig = (signals || [])\n    .filter(s => !s.Signal_Date__c || daysBetween(s.Signal_Date__c, today) <= OUTREACH.MAX_SIGNAL_AGE_DAYS)\n    .sort((x, y) => clean(y.Signal_Date__c).localeCompare(clean(x.Signal_Date__c)))\n    .map(s => ({ type: s.Signal_Type__c, date: s.Signal_Date__c || null, detail: clean(s.Detail__c) || null, source_url: s.Source_URL__c || null }));\n  return {\n    contact_id: contact.Id,\n    account_id: contact.AccountId,\n    account: a.Name,\n    domain: a.Domain__c,\n    tier: a.Signal_Tier__c,\n    primary_signal: a.Primary_Signal__c || null,\n    open_sales_roles: a.Open_Sales_Roles_Count__c || null,\n    funding_stage: a.Funding_Stage__c || null,\n    last_funding_amount: a.Last_Funding_Amount__c || null,\n    last_funding_date: a.Last_Funding_Date__c || null,\n    incumbent_comp_tool: a.Incumbent_Comp_Tool__c && a.Incumbent_Comp_Tool__c !== 'Unknown' ? a.Incumbent_Comp_Tool__c : null,\n    first_name: clean(contact.FirstName).replace(/[.,;:]+$/, ''),   // \"Ed.\" \u2192 \"Ed\" (greeting check)\n    title: clean(contact.Title),\n    persona: contact.Persona__c || null,\n    channel: channelFor(contact),\n    signals: sig,\n    owner_id: a.BDR__c || a.OwnerId,   // Task owner: BDR (routing), else AE\n  };\n}\n\n// Only the fields Claude needs (no ids, no owner)\nfunction promptPayload(ctx) {\n  const { contact_id, account_id, owner_id, domain, tier, ...rest } = ctx;\n  return rest;\n}\n\nfunction buildRequest(ctx, model) {\n  return {\n    model: model || OUTREACH.MODEL,\n    max_tokens: OUTREACH.MAX_TOKENS,\n    system: SYSTEM_PROMPT,\n    messages: [{ role: 'user', content: 'Write the outreach prep for this contact.\\n\\n' + JSON.stringify(promptPayload(ctx), null, 2) }],\n    output_config: { format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },\n  };\n}\n\n// Parses a Messages API response (or an error body) into { out, error, usage }\nfunction parseResponse(resp) {\n  const body = resp && resp.body !== undefined ? resp.body : resp;\n  const status = resp && resp.statusCode;\n  if (status && status >= 300) return { error: 'HTTP ' + status + ': ' + JSON.stringify(body).slice(0, 300) };\n  if (!body || !Array.isArray(body.content)) return { error: 'No content in response: ' + JSON.stringify(body).slice(0, 300) };\n  if (body.stop_reason && !['end_turn', 'stop_sequence'].includes(body.stop_reason)) return { error: 'stop_reason ' + body.stop_reason };\n  const text = (body.content.find(b => b.type === 'text') || {}).text;\n  if (!text) return { error: 'No text block' };\n  try { return { out: JSON.parse(text), usage: body.usage || null }; }\n  catch (e) { return { error: 'Invalid JSON: ' + text.slice(0, 200) }; }\n}\n\n// Every number in the copy must exist in the input facts (hallucination guard)\nfunction unknownNumbers(text, ctx) {\n  const facts = JSON.stringify(promptPayload(ctx)).replace(/,/g, '');\n  const found = (clean(text).replace(/,/g, '').match(/\\d+(?:\\.\\d+)?/g) || []);\n  return found.filter(n => {\n    if (facts.includes(n)) return false;\n    const num = Number(n);\n    if (/^20\\d\\d$/.test(n)) return false;                 // years\n    if (num === 20 && /20[- ]minute/i.test(text)) return false;   // the CTA\n    // amounts written short: \"$50M\" \u2194 50000000, \"$1.2B\" \u2194 1200000000\n    for (const mult of [1e3, 1e6, 1e9]) if (facts.includes(String(Math.round(num * mult)))) return false;\n    return true;\n  });\n}\n\nfunction validate(out, ctx) {\n  const errors = [];\n  const o = out || {};\n  const why = clean(o.why_now), subj = clean(o.email_subject), body = clean(o.email_body), note = clean(o.linkedin_note);\n  if (!why) errors.push('why_now empty');\n  if (why.length > 400) errors.push('why_now > 400 chars (' + why.length + ')');\n  const all = [why, subj, body, note].join('\\n');\n  if (/[\\w.+-]+@[\\w-]+\\.[\\w.]+/.test(all)) errors.push('contains an email address');\n  if (/https?:\\/\\/|www\\./i.test(all)) errors.push('contains a link');\n  for (const re of OUTREACH.BANNED) if (re.test([subj, body, note].join('\\n'))) errors.push('prospect-facing copy uses banned word ' + re);\n  const nums = unknownNumbers(all, ctx);\n  if (nums.length) errors.push('numbers not in input facts: ' + nums.join(', '));\n  if (ctx.channel === 'Email' || ctx.channel === 'Email + LinkedIn') {\n    if (!subj) errors.push('email_subject empty');\n    if (words(subj) > 7) errors.push('subject > 7 words');\n    if (!body) errors.push('email_body empty');\n    if (words(body.replace(OUTREACH.SIGN_OFF, '')) > 90) errors.push('email_body > 90 words (' + words(body) + ')');\n    if (ctx.first_name && !body.startsWith('Hi ' + ctx.first_name)) errors.push('greeting is not \"Hi ' + ctx.first_name + ',\"');\n    if (!body.trim().endsWith(OUTREACH.SIGN_OFF)) errors.push('missing sign-off');\n  }\n  if (ctx.channel === 'LinkedIn Task') {\n    if (!note) errors.push('linkedin_note empty');\n    if (note.length > 300) errors.push('linkedin_note > 300 chars');\n  }\n  return errors;\n}\n\nfunction addBusinessDays(iso, n) {\n  const d = new Date(iso + 'T12:00:00Z');\n  while (n > 0) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) n--; }\n  return d.toISOString().slice(0, 10);\n}\n\n// Salesforce writes for one validated output. Drafts are stored, never sent.\nfunction writesFor(ctx, out, today, nowIso, existingStatus, hasOpenTask) {\n  const isEmail = ctx.channel === 'Email' || ctx.channel === 'Email + LinkedIn';\n  const contact = {\n    attributes: { type: 'Contact' }, Id: ctx.contact_id,\n    Why_Now_Rationale__c: clean(out.why_now),\n    Draft_Subject__c: isEmail ? (OUTREACH.DRAFT_PREFIX + clean(out.email_subject)).slice(0, 255) : null,\n    Draft_Body__c: isEmail ? clean(out.email_body) + (clean(out.linkedin_note) ? '\\n\\n--- LinkedIn note ---\\n' + clean(out.linkedin_note) : '')\n                           : (clean(out.linkedin_note) ? '--- LinkedIn note ---\\n' + clean(out.linkedin_note) : null),\n    Draft_Generated_At__c: nowIso,\n  };\n  if (!existingStatus || existingStatus === 'Not Started') contact.Outreach_Status__c = 'Drafted';\n  if (hasOpenTask || ctx.channel === 'Manual Research') return { contact, task: null };\n  const tierA = ctx.tier === 'A';\n  const linkedin = ctx.channel === 'LinkedIn Task';\n  const primary = ctx.primary_signal || (ctx.signals[0] && ctx.signals[0].type) || 'Signal';\n  const src = (ctx.signals.find(s => s.source_url) || {}).source_url;\n  const task = {\n    attributes: { type: 'Task' }, WhoId: ctx.contact_id, WhatId: ctx.account_id, OwnerId: ctx.owner_id,\n    Subject: linkedin ? `Tier ${ctx.tier} \u2013 LinkedIn connect \u2013 ${ctx.account}` : `Tier ${ctx.tier} \u2013 ${primary} \u2013 ${ctx.account}`,\n    ActivityDate: addBusinessDays(today, tierA ? 1 : 3),\n    Priority: tierA ? 'High' : 'Normal', Status: 'Not Started',\n    Description: ['Why now: ' + clean(out.why_now), '',\n      linkedin ? 'Next step: send the LinkedIn note saved in Draft Body on the Contact.'\n               : 'Next step: review the draft saved on the Contact (Draft Subject / Draft Body), edit, then send it yourself. Drafts are never sent automatically.',\n      src ? '\\nSignal source: ' + src : ''].join('\\n').trim(),\n    Created_By_Automation__c: true,\n    Automation_Reason__c: linkedin ? 'LinkedIn Outreach' : tierA ? 'Tier A Outreach' : 'Tier B Outreach',\n  };\n  return { contact, task };\n}\n\n// Stand-in for Claude while there is no API key: same response shape, built only from the input facts\nfunction mockResponse(ctx) {\n  const s = ctx.signals[0] || { type: ctx.primary_signal || 'Hiring RevOps', date: null, detail: '' };\n  const when = s.date ? new Date(s.date + 'T12:00:00Z').toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : 'recently';\n  const what = s.type === 'Sales Team Growth' && ctx.open_sales_roles ? `${ctx.open_sales_roles} sales roles open`\n    : s.type === 'Funding' && ctx.funding_stage ? `the ${ctx.funding_stage} round`\n    : s.type === 'Hiring RevOps' ? 'the new RevOps hire' : s.type.toLowerCase();\n  const out = {\n    why_now: `${ctx.account} shows ${what} (${when}). Growth like this multiplies plan changes and payout questions, so commissions are worth automating now.`,\n    email_subject: ctx.channel === 'LinkedIn Task' ? '' : `commissions as ${ctx.account.toLowerCase()} grows`,\n    email_body: ctx.channel === 'LinkedIn Task' ? '' : [`Hi ${ctx.first_name},`, '',\n      `Saw ${what} at ${ctx.account} (${when}). Teams at that stage usually feel it first in commission calcs and payout questions.`, '',\n      'Flozero calculates commissions straight from Salesforce and gives reps live statements with an audit trail.', '',\n      'Open to a 20-minute look?', '', OUTREACH.SIGN_OFF].join('\\n'),\n    linkedin_note: ctx.channel === 'LinkedIn Task' ? `Congrats on ${what} at ${ctx.account}. I work on commission automation for growing sales teams and would love to connect.` : '',\n  };\n  return { statusCode: 200, body: { content: [{ type: 'text', text: JSON.stringify(out) }], stop_reason: 'end_turn', usage: { input_tokens: 0, output_tokens: 0 }, mock: true } };\n}\n\n\nconst cfg = $('Config').first().json;\nconst today = cfg.runAt.slice(0, 10);\nconst reqs = $('Build requests').all(), res = $input.all();\nconst contacts = [], tasks = [], review = [], drafts = [];\nlet inTok = 0, outTok = 0;\nreqs.forEach((r, i) => {\n  const { ctx, status, hasOpenTask } = r.json;\n  const p = parseResponse(res[i] ? res[i].json : null);\n  if (p.usage) { inTok += p.usage.input_tokens || 0; outTok += p.usage.output_tokens || 0; }\n  const errors = p.error ? [p.error] : validate(p.out, ctx);\n  if (errors.length) { review.push({ account: ctx.account, channel: ctx.channel, errors }); return; }\n  const w = writesFor(ctx, p.out, today, cfg.runAt, status, hasOpenTask);\n  contacts.push(w.contact); if (w.task) tasks.push(w.task);\n  drafts.push({ account: ctx.account, channel: ctx.channel, why_now: w.contact.Why_Now_Rationale__c,\n                subject: w.contact.Draft_Subject__c, body: w.contact.Draft_Body__c, task: w.task ? w.task.Subject : '(open task exists)' });\n});\n// Sonnet 5.5 list price $2 / $10 per MTok (Haiku 5.5: $0.10 / $0.50)\nconst price = String(cfg.model).includes('haiku') ? [0.10, 0.50] : [2, 10];\nconst estCostUsd = Math.round((inTok * price[0] + outTok * price[1]) / 1e4) / 100;\nreturn [{ json: { dryRun: cfg.dryRun, mock: cfg.useMock, contacts, tasks, review, drafts, tokens: { input: inTok, output: outTok }, estCostUsd } }];\n"
+      }
+    },
+    {
+      "id": "9d2c2ee7-b086-51c7-b365-4960446b8551",
+      "name": "Update Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $('Config').first().json.sfBase }}/composite/sobjects",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ allOrNone: false, records: $('Config').first().json.dryRun ? [] : $('Validate + plan').first().json.contacts }) }}"
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "d0498b83-d399-5c30-bf7d-2fbb1b3b68f8",
+      "name": "Create Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.sfBase }}/composite/sobjects",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ allOrNone: false, records: $('Config').first().json.dryRun ? [] : $('Validate + plan').first().json.tasks }) }}"
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "ol4NeAZvoDuiCyN2",
+          "name": "Salesforce signal-dev (PKCE)"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "27441e87-3c97-53a0-83c9-ba2446d06a9f",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst p = $('Validate + plan').first().json;\nfunction res(node, sent) {\n  if (p.dryRun || !sent.length) return { ok: 0, errors: [] };\n  const j = $(node).first().json, body = Array.isArray(j.body) ? j.body : [];\n  if (!body.length) return { ok: 0, errors: [{ status: j.statusCode, error: JSON.stringify(j.body).slice(0, 400) }] };\n  return { ok: body.filter(b => b.success).length, errors: body.filter(b => !b.success).map(b => JSON.stringify(b.errors).slice(0, 300)) };\n}\nconst c = res('Update Contacts', p.contacts), t = res('Create Tasks', p.tasks);\nreturn [{ json: { runAt: $('Config').first().json.runAt, dryRun: p.dryRun, mock: p.mock,\n  planned: { contacts: p.contacts.length, tasks: p.tasks.length }, written: { contacts: c.ok, tasks: t.ok },\n  needsReview: p.review, errors: c.errors.length + t.errors.length, errorDetail: [...c.errors, ...t.errors],\n  tokens: p.tokens, estCostUsd: p.estCostUsd, drafts: p.drafts } }];\n"
+      },
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Run Claude outreach": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Query Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Contacts": {
+      "main": [
+        [
+          {
+            "node": "Query Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Signals": {
+      "main": [
+        [
+          {
+            "node": "Query open automated Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query open automated Tasks": {
+      "main": [
+        [
+          {
+            "node": "Build requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build requests": {
+      "main": [
+        [
+          {
+            "node": "Use mock?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use mock?": {
+      "main": [
+        [
+          {
+            "node": "Mock Claude",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Claude": {
+      "main": [
+        [
+          {
+            "node": "Validate + plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Validate + plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate + plan": {
+      "main": [
+        [
+          {
+            "node": "Update Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Contacts": {
+      "main": [
+        [
+          {
+            "node": "Create Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tasks": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}
