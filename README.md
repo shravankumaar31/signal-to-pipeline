@@ -54,6 +54,22 @@ flowchart LR
 | **5. Outreach** | Claude writes a signal-grounded rationale, a ≤ 90-word email (or LinkedIn note) and a Task spec. n8n writes the rationale and Tasks to Salesforce, one open Task per contact | [`prompts/why_now_and_email.md`](prompts/why_now_and_email.md) |
 | **6. Report** | Five reports and one dashboard prove each stage | [`docs/reporting.md`](docs/reporting.md) |
 
+### Capture and enrichment
+
+Job-post signals come from two Apify actors that scrape Greenhouse, Lever, Ashby and Workable boards,
+for about $1 of a $5 free tier. Funding and leadership signals come from a CSV and a seed list.
+
+![Apify actors used for job-post signals](screenshots/apify_actors.png)
+
+In Clay, the **Flozero Signal Engine** workbook has two linked tables:
+- `clay_accounts_v1` (21 rows, 73 columns) handles enrichment, tech stack, scoring and tiering.
+- `clay_contacts_v1` (63 rows, 46 columns) handles persona ranking, primary-contact pick, the email waterfall and verification.
+
+Accounts send rows to contacts with Clay's "send table data" step. Credits were rationed by tier,
+for 40 used in total.
+
+<p align="center"><img src="screenshots/clay_workbook.png" alt="Clay workbook: accounts table feeding contacts table" width="520"></p>
+
 ### Account routing
 
 Every Tier A/B account is assigned to an AE and a BDR:
