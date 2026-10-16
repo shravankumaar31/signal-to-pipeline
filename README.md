@@ -91,11 +91,18 @@ automated Tasks follow the BDR. The rules are tested against six scenarios in
 
 ### n8n workflows
 
-All three are generated from code (`n8n/build_*.py`) and import as JSON.
+All four are generated from code (`n8n/build_*.py`) and import as JSON.
 
 ![Phase 4: Clay CSV to Salesforce upsert](screenshots/n8n_phase4_clay_to_salesforce.png)
 ![Routing: auto-assign Accounts to AE / BDR](screenshots/n8n_routing.png)
 ![Phase 5: Claude outreach to Salesforce](screenshots/n8n_phase5_outreach.png)
+
+**Phase 5b: Claude in n8n.** n8n calls the Claude API itself, so this step runs without a chat session.
+The *Use mock?* switch routes to a stand-in for testing without an API key. *Validate + plan* checks
+every draft before anything is written. There is no email node, so drafts are saved on the Contact and
+are never sent.
+
+![Phase 5b: Claude outreach in n8n, drafts saved and never sent](screenshots/n8n_phase5b_claude_outreach.png)
 
 ---
 
