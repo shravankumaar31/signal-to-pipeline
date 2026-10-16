@@ -394,3 +394,11 @@ work around a tool limit, or fix a data-quality problem.
 - Result: Gong → CaptivateIQ (vendor case study; set by hand in Salesforce on 2026-10-15, the override keeps future Phase 4 runs from reverting it); Notion's Everstage re-confirmed. The other 10 stay Unknown, marked "Checked - not found" with the date. Sierra and Keeper have open comp roles that name no platform (Keeper asks for Excel/Sheets skills, which is not evidence of a spreadsheet process).
 - Rule: only a public, linkable source counts; no guessing from company size or stack. Scores are unchanged (the competitor-mention points come from live signals, not this field).
 - Trade-off: manual research doesn't scale; at volume this becomes a Claygent column or a scheduled Claude research step writing the same CSV.
+
+## #49 — Phase 6: lean reporting layer in Salesforce
+- Date: 2026-10-15
+- Status: Done
+- Decision / Solution: 5 reports in a "Signal-to-Pipeline" folder — Accounts by Signal Tier, Signals by Type (Accounts with Signals), Rep Load (matrix: Account Owner × BDR, Tier A/B), Open Automated Tasks (Tasks: Created By Automation = true, open; grouped by Assigned + Automation Reason), Data Completeness (Missing Fields not blank) — and one dashboard "Signal-to-Pipeline Overview" (3 metrics, donut, 3 bar charts, review table).
+- Result (matches the pipeline logs): 19 target accounts (A 5 / B 9 / C 5); 38 signals (Sales Team Growth 13, Hiring RevOps 11, Funding 7, Competitor Mention 5, Other 1, Leadership Change 1); Maya 10 / Priya 4 AE, Lucas 10 / Daniel 4 BDR; 14 open tasks (Lucas: Tier A 5, Tier B 4, LinkedIn 1; Daniel: Tier B 4); 7 accounts needing review (4 Partial headcount + 3 Verify CRM).
+- Why lean: the 7-report spec was more than the story needs; these 5 prove each stage (signals → scoring → routing → outreach → data quality) in one screen.
+- Gotchas: report "Show Me" defaults to My/My team's records — set All; "Created By" is the user lookup, the pipeline flag is the custom "Created By Automation" checkbox; summing Signal Score or Employees produces meaningless totals — turn Sum off or use Average; Data Completeness expected 7, not 4 (the spec only counted Partial).

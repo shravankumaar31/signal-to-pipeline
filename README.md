@@ -1,80 +1,138 @@
 # Signal-to-Pipeline Engine
 
-Capture buying signals, enrich and score accounts in Clay, write every field back to Salesforce
-with explicit ownership rules, and use Claude via MCP to draft "why now" outreach and create rep tasks.
+**Buying signals in, routed and worked pipeline out.** This project captures public buying signals,
+enriches and scores accounts in Clay, and loads them into Salesforce through n8n with explicit
+write-back rules. It then routes each account to the right AE and BDR by territory, capacity, tenure and
+availability, and uses Claude via MCP to write a "why now" rationale, a test-inbox email draft and a
+rep Task for every target contact.
 
-**Fictional seller:** **Flozero** — *Commissions on autopilot. Zero spreadsheets, zero disputes.*
-Sales compensation (ICM) platform; CPQ and quota/territory planning are expansion modules.
-**ICP:** B2B companies with 20–300 quota-carrying reps, Series B–D, Salesforce CRM, US + Canada (`docs/signal_taxonomy.md`)
+![Signal-to-Pipeline Overview dashboard](screenshots/phase6_dashboard.png)
 
-> Flozero is a fictional company created for this portfolio project. Real tools named in this repo
-> (e.g. comp, CPQ and planning vendors) appear only as data — competitor or incumbent signals.
+| 19 | 38 | 14 | 14 | 7 |
+|---|---|---|---|---|
+| target accounts scored (A 5 · B 9 · C 5) | signals logged | Tier A/B accounts routed to 4 reps | outreach Tasks with rationale + draft | accounts flagged for review, never guessed |
 
-> Status: Phase 6 next — reporting and completeness checks (Phases 0–5 complete)
+**Fictional seller:** Flozero, a sales-compensation (ICM) platform. Tagline: *"Commissions on autopilot.
+Zero spreadsheets, zero disputes."*
+**ICP:** B2B companies with 20–300 quota-carrying reps, Series B–D, on Salesforce, in the US and Canada
+([`docs/signal_taxonomy.md`](docs/signal_taxonomy.md)).
 
-## Architecture
+> Flozero and its sales team are fictional. The target accounts are real companies, and only company-level
+> public data (domains, job-post URLs, funding news) is committed. Contact data lives only in Clay and a
+> private Salesforce dev org, and all outreach goes to a test inbox.
 
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Capture
+    A1[Job posts<br/>Apify scrape] --> C
+    A2[Funding rounds<br/>CSV] --> C
+    A3[Leadership changes<br/>seed list] --> C
+  end
+  C[Clay · accounts table<br/>enrich · tech stack · score · tier] --> D[Clay · contacts table<br/>persona ranking · email waterfall<br/>verification · channel]
+  C -- CSV --> N1
+  D -- CSV --> N1
+  N1[n8n · Phase 4<br/>upsert Accounts, Signals, Contacts<br/>by external ID] --> SF[(Salesforce)]
+  SF --> N2[n8n · Routing<br/>territory → capacity → tenure → OOO]
+  N2 --> SF
+  SF --> CL[Claude via MCP<br/>why-now rationale<br/>Gmail draft · Task spec]
+  CL -- Gmail --> G[Test inbox<br/>drafts only]
+  CL -- JSON --> N3[n8n · Phase 5<br/>rationale + Tasks]
+  N3 --> SF
+  SF --> R[Reports + dashboard]
 ```
-Signal sources ──► Clay table ──► n8n ──► Salesforce
-(Apify job scrape,  (enrich, score,  (webhook,     ▲
- funding CSV,        tier, dedupe)    upsert,      │ MCP: read Tier A,
- seed list)                           routing)     │ create Tasks
-                                         │         │
-                                         ▼         │
-                                   Claude via MCP ─┘
-                                   (why-now rationale,
-                                    Gmail drafts to test inbox)
-```
 
-## Phases
-
-| # | Phase | Status |
+| Stage | What happens | Where |
 |---|---|---|
-| 0 | Setup: repo, Salesforce org, schema, sales team, Clay | Done (n8n self-hosted locally, `scripts/start_n8n.sh`) |
-| 1 | ICP and signal taxonomy with weights | Done (`docs/signal_taxonomy.md`) |
-| 2 | Signal capture (Apify job scrape, funding CSV, leadership seed) | Done — 21-account test set (`data/processed/account_set_preview.csv`) |
-| 3 | Enrichment and scoring in Clay | Done — 2 tables (accounts → contacts), 14 primaries, 13 verified emails, 40 credits (`clay/`) |
-| 3.5 | Field mapping and write-back rules | Done (`docs/salesforce_schema.md`, `n8n/lib/mapping.js`) |
-| 4 | Salesforce upserts via n8n | Done — 19 Accounts, 38 Signals, 14 Contacts, 0 errors (`n8n/workflows/clay_to_salesforce.json`) |
-| 5 | Claude + MCP: rationale, drafts, tasks | Done — 14 rationales, 13 test-inbox Gmail drafts, 14 Tasks (`prompts/why_now_and_email.md`, `n8n/workflows/outreach_to_salesforce.json`) |
-| 5.5 | Account routing to AEs/BDRs (territory, capacity, tenure, OOO) | Done — 14 A/B accounts routed (AE: Maya 10, Priya 4; BDR: Lucas 10, Daniel 4, Hannah's East accounts on OOO coverage), Tier C in RevOps queue (`n8n/workflows/route_accounts.json`, decision #47) |
-| 6 | Reporting, completeness checks, README polish | Not started |
+| **1. Signals** | Six signal types with weights and decay: Hiring RevOps, Sales Team Growth, Funding, Leadership Change, Competitor Mention, Other | [`docs/signal_taxonomy.md`](docs/signal_taxonomy.md) |
+| **2. Enrich + score** | Clay enriches firmographics and tech stack, scores 0–100 and assigns a tier (A ≥ 60 with at least one fresh signal, B 35–59, C, Excluded), then ranks contacts by persona and seniority and verifies emails | [`clay/`](clay/) |
+| **3. Load** | n8n upserts by external ID (`Domain__c`, `Signal_Key__c`, `Email_Key__c`), so re-runs never duplicate. Fill-if-blank fields protect rep edits, and conflicting data is flagged instead of guessed | [`n8n/lib/mapping.js`](n8n/lib/mapping.js), [`docs/salesforce_schema.md`](docs/salesforce_schema.md) |
+| **4. Route** | Each Tier A/B account gets an AE (Account owner) and a BDR, with the reason written on the record | [`n8n/lib/routing.js`](n8n/lib/routing.js) |
+| **5. Outreach** | Claude writes a signal-grounded rationale, a ≤ 90-word email (or LinkedIn note) and a Task spec. n8n writes the rationale and Tasks to Salesforce, one open Task per contact | [`prompts/why_now_and_email.md`](prompts/why_now_and_email.md) |
+| **6. Report** | Five reports and one dashboard prove each stage | [`docs/reporting.md`](docs/reporting.md) |
 
-## Backlog (after the base build ships)
+### Account routing
 
-Rep-facing features layered on once Phases 0–6 are stable:
+Every Tier A/B account is assigned to an AE and a BDR:
 
-- Account brief + daily priority list (BDR)
-- Reply triage + re-engagement dates (BDR)
-- Pre-meeting brief from calendar events (AE)
-- Signal feedback loop: meeting rate by signal type → recalibrate weights (RevOps)
-- Social pain signals: public forum / community posts describing comp pain (e.g. "commissions in Excel"), mapped to an account → new "Pain Post" signal type (decision #32)
-- Later: buying committee mapping, job-change alerts, post-call updates, BDR→AE handoff summary, deal risk alerts
+- **Territory first.** The territory comes from the account's HQ state or province, mapped to West, Central or East.
+- **Overflow when needed.** If the territory rep is full or not eligible, Tier A goes to the highest quota attainment and Tier B goes to the rep with the most spare capacity.
+- **Ramping reps** (first 90 days) carry half capacity and no Tier A accounts.
+- **Out of office** means temporary coverage. The home rep is remembered and gets the account back automatically.
+- **Inactive** means permanent reassignment.
+- **Tier C** stays in the RevOps queue.
+
+Ownership is sticky, so a re-run with no changes moves nothing. Contacts follow the AE, and open
+automated Tasks follow the BDR. The rules are tested against six scenarios in
+[`n8n/test_routing.js`](n8n/test_routing.js).
+
+![Routing section on an account record](screenshots/routing_account_keeper.png)
+
+*Keeper Security is a Tier A account in Central territory. The Central AE is ramping, so it overflowed to the top-attainment AE and BDR, and the reason is written on the record.*
+
+### n8n workflows
+
+All three are generated from code (`n8n/build_*.py`) and import as JSON.
+
+![Phase 4: Clay CSV to Salesforce upsert](screenshots/n8n_phase4_clay_to_salesforce.png)
+![Routing: auto-assign Accounts to AE / BDR](screenshots/n8n_routing.png)
+![Phase 5: Claude outreach to Salesforce](screenshots/n8n_phase5_outreach.png)
+
+---
+
+## Results
+
+| Phase | Outcome |
+|---|---|
+| 2 · Capture | 21-account test set from job scrapes, a funding CSV and a leadership seed list |
+| 3 · Clay | 2 linked tables. 14 primary contacts, 13 verified work emails, 1 LinkedIn-only, 40 credits used |
+| 4 · Load | 19 Accounts, 38 Signals and 14 Contacts upserted, 0 errors. Idempotent re-runs: 0 created, all updated |
+| 5 · Outreach | 14 rationales, 13 Gmail drafts to the test inbox, 1 LinkedIn note, 14 Tasks (Tier A due next day / High; Tier B due in 3 business days) |
+| 5.5 · Routing | AEs: Maya 10, Priya 4 (ramping). BDRs: Lucas 10, Daniel 4 (ramping). Hannah's East accounts are on coverage while she is out of office |
+| 6 · Reporting | 5 reports and a dashboard. 7 accounts flagged for review: 4 with a headcount conflict, 3 to verify CRM |
+
+## Engineering choices worth noting
+
+- **Every judgment call is logged.** [`docs/decisions.md`](docs/decisions.md) records 49 decisions, each with context, the decision, why, and the trade-off.
+- **Flag, don't guess.** When Clay's headcount sources disagree, the field stays blank and the account gets "Verify headcount". The incumbent comp tool is filled only from a linkable public source ([`data/research/incumbent_comp_tool.csv`](data/research/incumbent_comp_tool.csv)).
+- **Free-tier constraints made explicit.** Clay's API and webhooks are paid, so the hand-off is a CSV export. n8n reads it from a restricted inbox folder and moves processed files to `processed/<run>`, only when there are no errors.
+- **Auth that matches the org.** The org's External Client App enforces PKCE, so n8n uses a generic OAuth2 + PKCE credential and calls the REST and composite APIs directly.
+- **Claude for judgment, n8n for writes.** The model writes the wording, grounded only in signal data. Deterministic, logged code does every CRM write.
+- **Tested logic.** `node n8n/test_mapping.js` covers the field mapping and `node n8n/test_routing.js <accounts.csv>` covers the six routing scenarios.
+
+## Run it
+
+```bash
+bash scripts/start_n8n.sh                       # n8n on Node 22, file access limited to data/clay_exports
+sf project deploy start --source-dir force-app --target-org signal-dev
+bash scripts/seed_rep_capacity.sh               # rep status, OOO, start date, attainment, capacity
+# 1. Export the Clay tables to data/clay_exports/inbox/ → run "Phase 4 – Clay CSV → Salesforce upsert"
+# 2. Run "Routing – auto-assign Accounts to AE / BDR" (dryRun first)
+# 3. Claude (MCP) writes claude_outreach_<date>.json + test-inbox drafts → run "Phase 5"
+# 4. Re-run Routing so new Tasks land with the BDR
+```
 
 ## Repo layout
 
 ```
-docs/        schema, decisions log, signal taxonomy, findings
-data/raw/    seed lists, scraped signals (gitignored if they contain personal data)
-data/processed/
-clay/        scoring_reference.py (source of truth for scores) + Clay column specs
-n8n/         exported workflow JSON
-prompts/     Claude prompts / skill for the MCP step
-scripts/     one-shot scripts: schema changes, sales team setup
-force-app/   Salesforce metadata: fields, Signal__c object, tab, permission set
-salesforce/  DEPLOY.md (CLI deploy), manual setup checklist, report definitions
+docs/         decisions log, schema, signal taxonomy, reporting spec
+clay/         scoring reference + Clay formula specs
+n8n/          lib/ (mapping.js, routing.js), tests, workflow builders, workflows/*.json
+prompts/      Claude outreach spec (rationale, email, LinkedIn note, Task)
+force-app/    Salesforce metadata: custom fields, Signal__c, permission set
+salesforce/   territories, fictional sales team, rep capacity roster, deploy notes
+scripts/      n8n start, schema, sales team and rep-capacity setup
+data/         research overrides (committed); clay_exports/ is git-ignored
 screenshots/
 ```
 
-## Key docs
+## Backlog
 
-- `docs/salesforce_schema.md` — every field, its type, source and write rule
-- `docs/decisions.md` — every judgment call and why
-- `docs/signal_taxonomy.md` — ICP, signals, weights, decay, tiers, routing, worked examples
-- `salesforce/sales_team.csv`, `salesforce/territories.csv` — fictional reps and territory routing
-
-## Data and outreach policy
-
-- Outreach is drafted to a test inbox only; nothing is sent to real prospects.
-- Accounts are real companies; only company-level public information (domains, job post URLs, funding and
-  leadership news) is committed. Contact names and emails live only in the private Salesforce dev org.
+- Unattended runs: move the Claude step into n8n via the API and schedule the chain
+- Signal feedback loop: meeting rate by signal type → recalibrate weights
+- Account brief + daily priority list (BDR); pre-meeting brief from calendar (AE)
+- Reply triage and re-engagement dates; BDR → AE handoff summary
+- Pain-post signals from public community threads (decision #32)

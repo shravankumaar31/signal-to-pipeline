@@ -43,10 +43,10 @@ Each report lists the numbers it should show after the first load (2026-10-14/15
 - **Expect 14 contacts:** Drafted 13 · Not Started 1 (Socure, LinkedIn path). Persona: Head of RevOps 10 · Sales Ops / Comp Manager 2 · CRO / VP Sales 2.
 
 ### R6 · Data Completeness — Accounts
-- Type: Accounts. Filters: `Enrichment Status` = Partial.
+- Type: Accounts. Filters: Signal Tier = A, B, C; `Missing Fields` not equal to (blank). Group: Signal Tier (+ Enrichment Status).
 - Columns: Account Name, Signal Tier, Missing Fields, Employee Range, Enrichment Date.
-- **Expect 4:** Notion (A), Ema (B), Flai (C), Outmarket (C), all "NumberOfEmployees; Verify headcount" (+ "Verify CRM" for Ema, Outmarket).
-- Tip: also run it with `Missing Fields` contains "Verify CRM" → 5 accounts (Flow Engineering, Metaview, Chainguard, Outmarket, Ema).
+- **Expect 7 (A 1 / B 2 / C 4):** 4 Partial — Notion (A), Ema (B), Flai (C), Outmarket (C), all "NumberOfEmployees; Verify headcount" (+ "Verify CRM" for Ema, Outmarket); 3 Complete but flagged "Verify CRM" — Metaview (B), Flow Engineering (C), Chainguard (C).
+- Built in the org as "Data Completeness" (Signal-to-Pipeline folder).
 
 ### R7 · Data Completeness — Contacts
 - Type: Contacts & Accounts. Filters: `Enrichment Status` = Partial.
@@ -59,13 +59,13 @@ Each report lists the numbers it should show after the first load (2026-10-14/15
 | 1 | Metric: Tier A accounts | R1 filtered to Tier = A (or a summary report) | 5 |
 | 1 | Metric: Open automated tasks | R3 (Status ≠ Completed) | 14 |
 | 1 | Metric: Contacts drafted | R5 (Outreach Status = Drafted) | 13 |
-| 1 | Metric: Partial records | R6 + R7 | 4 + 1 |
+| 1 | Metric: Accounts needing review | R6 | 7 |
 | 2 | Stacked bar: Accounts by Tier × Primary Signal | R1 | 5 / 9 / 5 |
 | 2 | Bar: Signals by Type | R2 | 38 |
 | 3 | Donut: Tasks by Automation Reason | R3 | 5 / 8 / 1 |
 | 3 | Funnel: Outreach Status | R5 | 13 / 1 |
 | 4 | Table: Tier A SLA overdue | R4 | 0 today |
-| 4 | Table: Partial accounts | R6 | 4 |
+| 4 | Table: Accounts needing review | R6 | 7 |
 
 Running user: set the dashboard to run as yourself (Dev org). Add a dashboard filter on Signal Tier if wanted.
 
